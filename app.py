@@ -8,7 +8,7 @@
 听课搭子 —— 英文课实时转写 + 逐句中文翻译 + AI 按主题总结 + 老师提问提醒 + 按课程存成 Markdown(可直接放进 Obsidian)
 声音来源可选:麦克风(线下课)/ 电脑播放的声音(网课、录播)
 每识别一句就刷新 live.md,方便其他 AI 工具实时读取课堂内容。
-开源协议:MIT
+许可证:PolyForm Noncommercial 1.0.0(免费个人/学习使用,禁止商用)
 """
 import os, sys, json, time, queue, threading, re, glob, webbrowser, datetime, shutil, urllib.parse
 

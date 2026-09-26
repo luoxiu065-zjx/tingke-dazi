@@ -167,7 +167,7 @@ canvas#wave{width:170px;height:30px}
         <div class="fact"><b>翻译 · 总结</b><span id="fLLM">DeepSeek</span></div>
         <div class="fact"><b>提问提醒</b><span id="fQA">默认关闭，录制时可打开</span></div>
       </div>
-      <p class="sig" id="sig">听课搭子 · 免费开源</p>
+      <p class="sig" id="sig">听课搭子 · 免费使用 · 源码公开</p>
     </div>
   </section>
 
@@ -237,7 +237,7 @@ async function loadConfig(){
   $("#device").onchange = ()=>{ lsSet("device",$("#device").value); refreshStart(); };
   const st = c.state;
   $("#where").textContent = "保存位置：" + c.record_root;
-  if(c.app) $("#sig").innerHTML = `${esc(c.app.name)} v${esc(c.app.version)} · 免费开源 · <a href="${esc(c.app.home)}" target="_blank" rel="noopener">原始仓库</a>`;
+  if(c.app) $("#sig").innerHTML = `${esc(c.app.name)} v${esc(c.app.version)} · 免费使用 · 源码公开 · <a href="${esc(c.app.home)}" target="_blank" rel="noopener">原始仓库</a>`;
   $("#fDevice").textContent = st.device==="cuda" ? "语音识别 · 显卡加速" : "语音识别 · CPU 模式";
   $("#fDeviceS").textContent = st.model + (st.device==="cuda" ? "" : "（没检测到 N 卡，准确率低一些）");
   $("#fLLM").textContent = st.translate ? "DeepSeek 已连接" : "未填 Key：只显示英文（在 .env 里填 DEEPSEEK_API_KEY）";
