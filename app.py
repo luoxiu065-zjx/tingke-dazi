@@ -61,7 +61,7 @@ PORT = int(os.getenv("PORT", "5000"))
 VAULT_DIR   = os.getenv("OBSIDIAN_VAULT", "").strip().strip('"')
 RECORD_SUB  = os.getenv("RECORD_SUBDIR", "课堂记录").strip().strip("/\\") or "课堂记录"
 RECORD_ROOT = os.path.join(VAULT_DIR, *RECORD_SUB.split("/")) if VAULT_DIR else os.path.join(BASE, "课堂记录")
-COURSES = [c.strip() for c in os.getenv("COURSES", "示例课程 机器学习，其他").split(",") if c.strip()]
+COURSES = [c.strip() for c in re.split(r"[,，]", os.getenv("COURSES", "示例课程 机器学习,其他")) if c.strip()]
 
 SAMPLE_RATE = 16000
 BLOCK       = 1600          # 0.1s
@@ -89,8 +89,21 @@ def publish(event):
             except Exception:
                 pass
 
+LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+
+def log(msg):
+    """所有状态/错误同时写进 logs/app-日期.log,黑窗口关了也能查。"""
+    line = "%s %s" % (datetime.datetime.now().strftime("%H:%M:%S"), msg)
+    print(line)
+    try:
+        os.makedirs(LOG_DIR, exist_ok=True)
+        with open(os.path.join(LOG_DIR, "app-%s.log" % datetime.date.today().isoformat()), "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except Exception:
+        pass
+
 def status(msg, level="info"):
-    print("[status] %s" % msg)
+    log("[%s] %s" % (level, msg))
     STATE["status"] = {"msg": msg, "level": level}
     publish({"type": "status", "msg": msg, "level": level})
 
@@ -106,6 +119,7 @@ history_lock = threading.Lock()
 seg_counter = 0
 SUMMARY = {"items": [], "upto": 0}   # items=[{topic, points:[{k,v}]}], upto=已总结到的 seg id
 
+HEALTH = {"audio": 0.0, "voice": 0.0, "seg": 0.0, "dropped": 0, "warned": ""}   # 看门狗用:最后收到声音/人声/字幕的时刻
 audio_q = queue.Queue(maxsize=60)   # (音频段, 开始秒数, 墙钟时间)
 text_q  = queue.Queue()
 
@@ -172,14 +186,25 @@ def list_devices():
     return out
 
 def audio_capture(gen, device_id):
+    """外层循环:声音设备中途出错(拔耳机、蓝牙断开、系统切换默认设备、休眠唤醒)就等 2 秒自动重连,直到这节课结束。"""
     com_init()
-    try:
-        dev = sc.get_microphone(device_id, include_loopback=True)
-    except Exception as e:
-        status("打开声音设备失败：%s" % e, "error"); return
+    fails = 0
+    while STATE["gen"] == gen and STATE["state"] == "recording":
+        try:
+            _capture_once(gen, device_id)
+            if fails:
+                status("声音已恢复,继续转写", "ok")
+            return
+        except Exception as e:
+            fails += 1
+            status("声音输入中断(第 %d 次):%s。2 秒后自动重连…" % (fails, e), "error")
+            time.sleep(2)
+
+def _capture_once(gen, device_id):
+    dev = sc.get_microphone(device_id, include_loopback=True)
     buf = []; voiced = 0.0; silence = 0.0; seg_t0 = None; seg_clock = None
     last_level = 0.0
-    try:
+    if True:
         with dev.recorder(samplerate=SAMPLE_RATE, channels=1, blocksize=SAMPLE_RATE // 2) as rec:   # 0.5s 缓冲,防识别占 CPU 时丢音
             while STATE["gen"] == gen and STATE["state"] == "recording":
                 data = rec.record(numframes=BLOCK)
@@ -187,6 +212,9 @@ def audio_capture(gen, device_id):
                 rms = float(np.sqrt(np.mean(mono ** 2)) + 1e-9)
                 dur = len(mono) / SAMPLE_RATE
                 now = time.time()
+                HEALTH["audio"] = now
+                if rms >= SILENCE_RMS:
+                    HEALTH["voice"] = now
                 if now - last_level > 0.1:
                     publish({"type": "level", "v": min(1.0, rms * 12)})
                     last_level = now
@@ -205,7 +233,7 @@ def audio_capture(gen, device_id):
                     try:
                         audio_q.put_nowait((seg, seg_t0, seg_clock))
                     except queue.Full:
-                        pass
+                        HEALTH["dropped"] += 1          # 识别跟不上,丢了一段(看门狗会提示)
                     buf = []; voiced = 0.0; silence = 0.0; seg_t0 = None
                 elif voiced == 0 and total > 2.0:
                     buf = buf[-5:]
@@ -215,8 +243,6 @@ def audio_capture(gen, device_id):
                 audio_q.put_nowait((np.concatenate(buf).astype(np.float32), seg_t0 or 0.0, seg_clock))
             except queue.Full:
                 pass
-    except Exception as e:
-        status("录音中断：%s" % e, "error")
 
 # ---------------- 语音识别 ----------------
 TERMS_DIR = os.path.join(BASE, "术语")      # 每门课一个 <课号>.txt,逗号或换行分隔,可自己加词
@@ -254,6 +280,14 @@ def whisper_worker():
     STATE["model_ready"] = True
     status("语音识别就绪(%s)。选好课程和声音来源，点「开始录制」。" % ("显卡加速" if WHISPER_DEVICE == "cuda" else "CPU 模式，准确率会低一些"), "ok")
     while True:
+        try:
+            _recognize_one(model)
+        except Exception as e:                     # 兜底:识别线程永远不退出
+            status("识别出错,已跳过这一段:%s" % e, "error")
+
+def _recognize_one(model):
+    global seg_counter
+    if True:
         seg, t0, clock = audio_q.get()
         publish({"type": "recognizing", "on": True})
         try:
@@ -264,19 +298,20 @@ def whisper_worker():
             text = " ".join(s.text.strip() for s in segments
                             if not (s.no_speech_prob > 0.6 and s.avg_logprob < -1.0)).strip()
         except Exception as e:
-            status("识别出错：%s" % e, "error"); continue
+            status("识别出错:%s" % e, "error"); return
         finally:
             publish({"type": "recognizing", "on": audio_q.qsize() > 0})
         text = re.sub(r"(\s*\.){3,}", " …", text).strip()
         # 课尾静音时的「Professor X … Professor X … Professor X」重复幻觉:同一短语连着 3 遍以上只留 1 遍
         text = re.sub(r"(\b.{4,40}?)(?:[\s…,.]*\1){2,}", r"\1", text)
         if not re.search(r"[A-Za-z]{2,}", text):     # 只剩标点(静音/杂音幻觉)的不要
-            continue
+            return
         clock_s = (clock or datetime.datetime.now()).strftime("%H:%M:%S")
         with history_lock:
             seg_counter += 1
             item = {"id": seg_counter, "t": fmt_t(t0), "clock": clock_s, "en": text, "zh": ""}
             history.append(item)
+        HEALTH["seg"] = time.time()
         publish(dict(type="seg", **item))
         if AUTO_QA["on"] and TRANSLATE_ENABLED and looks_like_question(text):
             qa_q.put(item["id"])
@@ -712,6 +747,7 @@ def start():
                      elapsed_base=0.0, resume_t=time.time(), device_id=device_id,
                      device_name=name, gen=STATE["gen"] + 1)
         gen = STATE["gen"]
+    HEALTH.update(audio=0.0, voice=0.0, seg=time.time(), dropped=0, warned="")
     threading.Thread(target=audio_capture, args=(gen, device_id), daemon=True).start()
     b = fetch_balance(force=True)
     BALANCE["session_start"] = b["total"] if b else None     # 记下开课时余额,算这节课花了多少
@@ -798,11 +834,36 @@ def stream():
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no",
                              "Connection": "keep-alive"})
 
+def watchdog():
+    """录制中每 5 秒检查一次:声音数据断了 / 有人说话但很久没新字幕 / 识别跟不上丢段,都在界面上提醒并写日志。"""
+    last_drop = 0
+    while True:
+        time.sleep(5)
+        if STATE["state"] != "recording":
+            HEALTH["warned"] = ""; continue
+        now = time.time()
+        started = STATE.get("resume_t") or now
+        msg = ""
+        if now - started > 15 and now - max(HEALTH["audio"], started) > 15:
+            msg = "已经 %d 秒没收到声音数据了:检查麦克风/声音来源,程序在自动重连" % int(now - max(HEALTH["audio"], started))
+        elif now - started > 240 and now - HEALTH["voice"] < 20 and now - max(HEALTH["seg"], started) > 180:
+            msg = "有声音但 3 分钟没有新字幕,识别可能卡住了。可以暂停再继续试试;不行就结束保存后重启程序"
+        elif HEALTH["dropped"] > last_drop + 3:
+            msg = "识别跟不上,最近丢了 %d 段声音(电脑太忙?可以关掉别的大程序)" % (HEALTH["dropped"] - last_drop)
+            last_drop = HEALTH["dropped"]
+        if msg and msg != HEALTH["warned"]:
+            HEALTH["warned"] = msg
+            status(msg, "error")
+        elif not msg and HEALTH["warned"]:
+            HEALTH["warned"] = ""
+            status("转写恢复正常", "ok")
+
 def start_threads():
     threading.Thread(target=whisper_worker,  daemon=True).start()
     threading.Thread(target=translate_worker, daemon=True).start()
     threading.Thread(target=summary_worker,  daemon=True).start()
     threading.Thread(target=qa_worker,       daemon=True).start()
+    threading.Thread(target=watchdog,        daemon=True).start()
 
 if __name__ == "__main__":
     backup_stale_live()
