@@ -1,0 +1,6 @@
+faster-whisper>=1.2,<2
+soundcard>=0.4.6
+numpy>=1.26
+flask>=3.0
+openai>=1.30
+python-dotenv>=1.0

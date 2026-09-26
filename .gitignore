@@ -1,0 +1,12 @@
+.env
+python/
+venv/
+models/
+课堂记录/
+课堂记录备份/
+live.md
+live.md.tmp
+__pycache__/
+*.pyc
+*.bak*
+_*.py

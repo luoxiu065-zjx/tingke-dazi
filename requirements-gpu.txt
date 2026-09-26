@@ -1,0 +1,3 @@
+# 有 NVIDIA 显卡时额外安装的显卡加速库(安装.bat 检测到显卡会自动装)
+nvidia-cublas-cu12>=12.4
+nvidia-cudnn-cu12>=9.1,<10

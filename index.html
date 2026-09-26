@@ -1,0 +1,365 @@
+<!doctype html>
+<!-- 听课搭子 (tingke-dazi) · Copyright (c) 2026 luoxiu065-zjx · https://github.com/luoxiu065-zjx/tingke-dazi · build tkdz-1bf2795e -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="author" content="听课搭子 · luoxiu065-zjx">
+<meta name="generator" content="tingke-dazi tkdz-1bf2795e">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>听课搭子</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%229%22 fill=%22%23FFC83D%22/%3E%3Ctext x=%2216%22 y=%2222%22 font-size=%2217%22 text-anchor=%22middle%22 fill=%22%2315233B%22 font-family=%22sans-serif%22 font-weight=%22700%22%3E%E6%90%AD%3C/text%3E%3C/svg%3E">
+<style>
+@font-face{font-family:Quotes;src:local("PingFang SC"),local("Microsoft YaHei"),local("Noto Sans SC");unicode-range:U+2018,U+2019,U+201C,U+201D}
+:root{
+  --paper:#FFFDF8; --sky:#EEF6FF; --card:#FFFFFF; --ink:#15233B; --ink-2:#3F4D63; --ink-3:#66738A;
+  --line:#E7E2D6; --line-cool:#D6E2F0; --sun:#FFC83D; --sun-soft:#FFF1C7; --sun-deep:#9A6700;
+  --blue:#2F7BEA; --blue-soft:#E4EFFE; --coral:#FF7A59; --ok:#16945C; --red:#D93B3B;
+  --sans:Quotes,"Segoe UI","PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+  --mono:"Cascadia Mono",Consolas,ui-monospace,monospace;
+  --ease:cubic-bezier(.22,1,.36,1);
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{font:15px/1.6 var(--sans);color:var(--ink);background:linear-gradient(var(--paper),var(--sky) 70%);display:flex;flex-direction:column;overflow:hidden}
+button,select{font:inherit}
+.mono{font-family:var(--mono)}
+/* ---------- 顶栏 ---------- */
+.top{height:58px;flex:none;display:flex;align-items:center;gap:14px;padding:0 20px;border-bottom:1px solid var(--line);background:rgba(255,253,248,.9)}
+.logo{display:flex;align-items:center;gap:9px;font-weight:700;font-size:16px}
+.logo i{width:28px;height:28px;border-radius:8px;background:var(--sun);display:grid;place-items:center;font-style:normal;font-weight:700;box-shadow:inset 0 -2px 0 rgba(21,35,59,.12)}
+.course-now{display:none;align-items:center;gap:6px;border:1px solid var(--line-cool);background:#fff;border-radius:8px;padding:3px 10px;font-size:13.5px;color:var(--ink-2)}
+.course-now b{font-family:var(--mono);font-weight:600;color:var(--ink)}
+.live .course-now{display:inline-flex}
+.spacer{flex:1}
+.src{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--ink-3)}
+select{appearance:none;border:1px solid var(--line-cool);background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%2366738A' stroke-width='2'%3E%3Cpath d='M2 4l4 4 4-4'/%3E%3C/svg%3E") no-repeat right 10px center;border-radius:9px;padding:7px 30px 7px 11px;color:var(--ink);max-width:300px;cursor:pointer}
+select:disabled{opacity:.6;cursor:not-allowed}
+.pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;border-radius:999px;padding:4px 11px;font-size:13px;color:var(--ink-2);cursor:pointer;white-space:nowrap}
+.pill b{font-variant-numeric:tabular-nums;color:var(--ink)}
+.pill.low b{color:var(--red)}
+.btn{border:0;border-radius:10px;padding:10px 16px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;font-weight:600;
+  transition:background-color .2s var(--ease),scale .2s var(--ease);box-shadow:0 1px 3px rgba(21,35,59,.06),inset 0 0 0 1px rgba(21,35,59,.08)}
+.btn:active{scale:.97}
+.btn:focus-visible{outline:none;box-shadow:0 0 0 2px var(--paper),0 0 0 4px rgba(47,123,234,.5)}
+.btn-sun{background:var(--sun);color:var(--ink)} .btn-sun:hover{background:#F7BC24}
+.btn-ghost{background:#fff;color:var(--ink)} .btn-ghost:hover{background:#F4F6FA}
+.btn-ink{background:var(--ink);color:#fff} .btn-ink:hover{background:#0E1A2D}
+.btn:disabled{opacity:.45;cursor:not-allowed;scale:1}
+/* ---------- 开始页 ---------- */
+main{flex:1;min-height:0;position:relative}
+#setup{height:100%;overflow:auto;display:grid;place-items:center;padding:24px}
+.setup-card{width:min(720px,100%);background:#fff;border:1px solid var(--line);border-radius:18px;padding:34px 36px;box-shadow:0 20px 50px -24px rgba(21,35,59,.25)}
+.setup-card h1{margin:0;font-size:26px;font-weight:700}
+.setup-card h1 .hl{background:linear-gradient(transparent 58%,var(--sun) 58% 90%,transparent 90%)}
+.setup-card .sub{margin:8px 0 24px;color:var(--ink-2)}
+.label{font-size:13.5px;color:var(--ink-3);margin:0 0 10px}
+.courses{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:24px}
+.course{border:1.5px solid var(--line-cool);background:#fff;border-radius:12px;padding:10px 16px;cursor:pointer;text-align:left;min-width:140px;transition:border-color .15s,background-color .15s}
+.course b{display:block;font-family:var(--mono);font-size:14.5px}
+.course small{color:var(--ink-3);font-size:12.5px}
+.course:hover{border-color:#B9CCE6}
+.course.on{border-color:var(--sun);background:var(--sun-soft)}
+.start-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.start-row .btn{padding:13px 22px;font-size:16px}
+.hint{font-size:13px;color:var(--ink-3)}
+.facts{margin-top:26px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.fact{background:var(--sky);border-radius:12px;padding:10px 12px;font-size:12.5px;color:var(--ink-2)}
+.sig{margin:22px 0 0;font-size:12px;color:var(--ink-3);text-align:right}
+.sig a{color:var(--ink-3)}
+.fact b{display:block;color:var(--ink);font-size:13.5px;margin-bottom:2px}
+/* ---------- 录制页 ---------- */
+#live{display:none;height:100%;padding:18px 20px 96px;gap:18px;grid-template-columns:minmax(0,1.35fr) minmax(320px,.8fr)}
+.live #live{display:grid}
+.live #setup{display:none}
+.card{background:#fff;border:1px solid var(--line-cool);border-radius:16px;min-height:0;display:flex;flex-direction:column;box-shadow:0 12px 30px -20px rgba(21,35,59,.25)}
+.card-h{display:flex;align-items:center;gap:8px;padding:14px 18px 10px;font-weight:700;font-size:15.5px}
+.card-h small{font-weight:400;color:var(--ink-3);font-size:12.5px}
+.card-h .r{margin-left:auto}
+.scroll{flex:1;min-height:0;overflow-y:auto;padding:0 18px 14px}
+.seg{display:grid;grid-template-columns:70px 1fr;gap:12px;padding:10px 8px;border-radius:10px}
+.seg.latest{background:#F6F9FE}
+.seg .ts{font:500 12.5px/1.9 var(--mono);color:var(--blue)}
+.seg .ts small{display:block;color:var(--ink-3);font-size:11px;line-height:1.3}
+.seg .en{font-size:15.5px;line-height:1.55}
+.seg .zh{font-size:14px;color:var(--ink-3);margin-top:3px}
+.empty{color:var(--ink-3);font-size:14px;padding:12px 6px}
+.recog{display:flex;align-items:center;gap:8px;color:var(--ink-3);font-size:13px;padding:0 26px 12px}
+.recog::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--blue);animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.25}}
+.col-r{display:flex;flex-direction:column;gap:18px;min-height:0}
+.sum{flex:1}
+.sum-sec{margin-bottom:14px}
+.sum-sec .topic{font-weight:600;margin-bottom:4px}
+.sum-sec ul{margin:0;padding-left:18px;color:var(--ink-2);font-size:14px;line-height:1.7}
+.sum-sec li b{color:var(--ink)}
+.dot{width:9px;height:9px;border-radius:3px;background:var(--sun)}
+/* 提问提醒:关掉时收成一条细栏 */
+.qa-card{flex:0 1 auto;max-height:52%}
+.qa-card.off{flex:none}
+.qa-card.off .scroll,.qa-card.off .h-on{display:none}
+.qa-card:not(.off) .h-off{display:none}
+.qa{border:1px solid #F1D27A;border-left:4px solid var(--sun);border-radius:12px;padding:10px 12px;margin-bottom:10px;background:#FFFDF6}
+.qa.new{animation:pop .5s var(--ease)}
+@keyframes pop{from{opacity:0;transform:translateY(10px) scale(.97)}}
+.qa .qh{font-size:12px;color:var(--sun-deep);font-weight:600}
+.qa .qh span{font-family:var(--mono);color:var(--ink-3);font-weight:400;margin-right:6px}
+.qa .qq{font-weight:600;margin:2px 0}
+.qa .qen{font-size:12.5px;color:var(--ink-3)}
+.qa .azh{font-size:13.5px;color:var(--ink-2);margin-top:6px}
+.qa .aen{margin-top:6px;background:var(--blue-soft);border-radius:8px;padding:7px 9px;font-size:14px;display:flex;gap:8px;align-items:flex-start}
+.qa .aen button{flex:none;border:0;background:#fff;color:var(--blue);border-radius:6px;padding:2px 8px;font-size:12px;cursor:pointer}
+.qa .qf{font-size:11px;color:var(--ink-3);margin-top:6px}
+.sw{position:relative;width:38px;height:22px;flex:none}
+.sw input{opacity:0;width:0;height:0}
+.sw span{position:absolute;inset:0;background:#CBD5E1;border-radius:99px;cursor:pointer;transition:.2s}
+.sw span::before{content:"";position:absolute;width:16px;height:16px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+.sw input:checked+span{background:var(--sun)} .sw input:checked+span::before{transform:translateX(16px)}
+/* 底部悬浮控制条 */
+.ctrl{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);display:flex;align-items:center;gap:12px;background:#fff;border:1px solid var(--line-cool);border-radius:16px;padding:10px 12px 10px 16px;box-shadow:0 14px 34px -14px rgba(21,35,59,.35);z-index:5}
+.rec{display:flex;align-items:center;gap:8px;font:600 15px var(--mono);font-variant-numeric:tabular-nums}
+.rec::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--coral);animation:blink 1.4s infinite}
+.paused .rec::before{background:#B6C0CE;animation:none}
+canvas#wave{width:170px;height:30px}
+/* 课堂记录抽屉 */
+.drawer{position:fixed;inset:0;z-index:20;pointer-events:none}
+.drawer .mask{position:absolute;inset:0;background:rgba(21,35,59,.25);opacity:0;transition:opacity .2s}
+.drawer .panel{position:absolute;right:0;top:0;bottom:0;width:min(380px,92vw);background:#fff;border-left:1px solid var(--line);transform:translateX(100%);transition:transform .25s var(--ease);display:flex;flex-direction:column}
+.drawer.open{pointer-events:auto} .drawer.open .mask{opacity:1} .drawer.open .panel{transform:none}
+.drawer .ph{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--line);font-weight:700}
+.drawer .ph button{border:0;background:none;font-size:20px;cursor:pointer;color:var(--ink-3)}
+#records{flex:1;overflow:auto;padding:6px 10px 16px}
+.grp{font:600 12.5px var(--mono);color:var(--ink-3);margin:14px 8px 6px}
+.rec-item{display:flex;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:9px;cursor:pointer;font-size:14px;color:var(--ink-2)}
+.rec-item:hover{background:var(--sky)}
+.rec-item .t{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.rec-item .w{flex:none;color:var(--ink-3);font-size:12px;font-family:var(--mono)}
+.drawer .where{padding:12px 18px;border-top:1px solid var(--line);font-size:12px;color:var(--ink-3);word-break:break-all}
+#toast{position:fixed;left:20px;bottom:20px;z-index:30;max-width:min(560px,80vw);background:var(--ink);color:#fff;border-radius:12px;padding:10px 14px;font-size:13.5px;box-shadow:0 10px 30px rgba(0,0,0,.2)}
+#toast.error{background:var(--red)}
+#toast a{color:var(--sun);margin-left:10px;cursor:pointer;text-decoration:underline}
+@media (max-width:900px){#live{grid-template-columns:minmax(0,1fr);overflow:auto}.facts{grid-template-columns:1fr}.src span{display:none}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="logo"><i>搭</i>听课搭子</div>
+  <span class="course-now" id="courseNow"></span>
+  <div class="spacer"></div>
+  <label class="src"><span>声音来源</span><select id="device" aria-label="声音来源"></select></label>
+  <span class="pill" id="bal" title="DeepSeek 余额,点一下刷新">DeepSeek <b id="balV">—</b></span>
+  <button class="btn btn-ghost" id="openRecords" type="button">课堂记录</button>
+</header>
+
+<main>
+  <section id="setup">
+    <div class="setup-card">
+      <h1>这节是<span class="hl">哪门课</span>?</h1>
+      <p class="sub">记录会按课程分文件夹保存，文件名带日期和 AI 起的标题。课程列表在 .env 的 COURSES 里改。</p>
+      <p class="label">课程</p>
+      <div class="courses" id="courses"></div>
+      <div class="start-row">
+        <button class="btn btn-sun" id="startBtn" type="button" disabled>🎙 开始录制</button>
+        <span class="hint" id="startHint">先选课程</span>
+      </div>
+      <div class="facts">
+        <div class="fact"><b id="fDevice">语音识别</b><span id="fDeviceS">加载中…</span></div>
+        <div class="fact"><b>翻译 · 总结</b><span id="fLLM">DeepSeek</span></div>
+        <div class="fact"><b>提问提醒</b><span id="fQA">默认关闭，录制时可打开</span></div>
+      </div>
+      <p class="sig" id="sig">听课搭子 · 免费开源</p>
+    </div>
+  </section>
+
+  <section id="live">
+    <div class="card">
+      <div class="card-h">实时字幕 <small>英文原文 · 下面是中文翻译</small></div>
+      <div class="scroll" id="trans"><div class="empty" id="transEmpty">等老师开口…</div></div>
+      <div class="recog" id="recog" hidden>正在识别…</div>
+    </div>
+    <div class="col-r">
+      <div class="card qa-card" id="qaCard">
+        <div class="card-h">提问提醒 <small class="h-on">老师提问时给你中英文回答思路 · 学习辅助</small><small class="h-off">已关闭</small>
+          <label class="sw r" title="开关提问提醒"><input type="checkbox" id="qaOn"><span></span></label>
+        </div>
+        <div class="scroll" id="qa"><div class="empty" id="qaEmpty">还没有人提问。</div></div>
+      </div>
+      <div class="card sum">
+        <div class="card-h"><span class="dot"></span>AI 总结 <small>按主题 · 约每 40 秒更新</small></div>
+        <div class="scroll" id="summary"><div class="empty">讲过一段内容后，这里会按主题出现要点。</div></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="ctrl" id="ctrl" hidden>
+    <span class="rec" id="timer">00:00:00</span>
+    <canvas id="wave"></canvas>
+    <button class="btn btn-ghost" id="pauseBtn" type="button">暂停</button>
+    <button class="btn btn-ink" id="stopBtn" type="button">下课，保存笔记</button>
+  </div>
+</main>
+
+<div class="drawer" id="drawer">
+  <div class="mask" id="drawerMask"></div>
+  <aside class="panel" aria-label="课堂记录">
+    <div class="ph">课堂记录 <button type="button" id="closeRecords" aria-label="关闭">×</button></div>
+    <div id="records"><div class="empty">加载中…</div></div>
+    <div class="where" id="where"></div>
+  </aside>
+</div>
+<div id="toast" hidden></div>
+
+<script>
+const $ = s => document.querySelector(s);
+let S = {state:"idle"}, courses = [], chosen = null, tick = null, t0 = 0, base = 0;
+function fmt(s){ s=Math.max(0,Math.floor(s)); const p=n=>String(n).padStart(2,"0"); return p(s/3600|0)+":"+p(s%3600/60|0)+":"+p(s%60); }
+function esc(s){ return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function toast(msg, level="info", link=null){
+  const t=$("#toast"); t.className=level; t.innerHTML=esc(msg)+(link?`<a id="tl">打开笔记</a>`:""); t.hidden=false;
+  if(link) $("#tl").onclick=()=>openUri(link);
+  clearTimeout(t._h); if(level!=="error") t._h=setTimeout(()=>t.hidden=true, link?15000:6000);
+}
+function openUri(uri){ fetch("/open",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({uri})}); }
+function lsGet(k){ try{return localStorage.getItem(k)}catch(e){return null} }
+function lsSet(k,v){ try{localStorage.setItem(k,v)}catch(e){} }
+
+async function loadConfig(){
+  const c = await (await fetch("/config")).json();
+  courses = c.courses;
+  $("#courses").innerHTML = courses.map((x,i)=>{ const [code,...rest]=x.split(" ");
+    return `<button type="button" class="course" data-i="${i}"><b>${esc(code)}</b><small>${esc(rest.join(" "))}</small></button>`; }).join("");
+  document.querySelectorAll(".course").forEach(b=>b.onclick=()=>{
+    document.querySelectorAll(".course").forEach(x=>x.classList.remove("on")); b.classList.add("on"); chosen=courses[+b.dataset.i]; refreshStart(); });
+  const saved = lsGet("device");
+  $("#device").innerHTML = c.devices.map(d=>`<option value="${esc(d.id)}">${esc(d.name)}</option>`).join("");
+  const pick = c.devices.find(d=>d.id===saved) || c.devices.find(d=>d.default) || c.devices[0];
+  if(pick) $("#device").value = pick.id;
+  $("#device").onchange = ()=>{ lsSet("device",$("#device").value); refreshStart(); };
+  const st = c.state;
+  $("#where").textContent = "保存位置：" + c.record_root;
+  if(c.app) $("#sig").innerHTML = `${esc(c.app.name)} v${esc(c.app.version)} · 免费开源 · <a href="${esc(c.app.home)}" target="_blank" rel="noopener">原始仓库</a>`;
+  $("#fDevice").textContent = st.device==="cuda" ? "语音识别 · 显卡加速" : "语音识别 · CPU 模式";
+  $("#fDeviceS").textContent = st.model + (st.device==="cuda" ? "" : "（没检测到 N 卡，准确率低一些）");
+  $("#fLLM").textContent = st.translate ? "DeepSeek 已连接" : "未填 Key：只显示英文（在 .env 里填 DEEPSEEK_API_KEY）";
+  applyState(st);
+}
+function refreshStart(){
+  const ok = chosen && S.model_ready && $("#device").value;
+  $("#startBtn").disabled = !ok;
+  $("#startHint").textContent = !chosen ? "先选课程" : !S.model_ready ? "语音模型加载中（第一次会自动下载，稍等）…" : "将录制："+chosen;
+}
+async function loadRecords(){
+  const r = await (await fetch("/records")).json();
+  $("#records").innerHTML = r.length ? r.map(g=>`<div class="grp">${esc(g.group)}</div>`+
+    g.items.map(it=>`<div class="rec-item" data-u="${esc(it.uri)}" title="${esc(it.when+" "+it.title)}"><span class="t">${esc(it.title||it.when)}</span><span class="w">${esc((it.when||"").slice(5,10))}</span></div>`).join("")).join("")
+    : `<div class="empty">还没有记录。上完第一节课，记录会出现在这里。</div>`;
+  document.querySelectorAll(".rec-item").forEach(e=>e.onclick=()=>openUri(e.dataset.u));
+}
+$("#openRecords").onclick=()=>{ $("#drawer").classList.add("open"); loadRecords(); };
+$("#closeRecords").onclick=$("#drawerMask").onclick=()=>$("#drawer").classList.remove("open");
+
+function applyState(st){
+  S = st;
+  if(st.auto_qa!==undefined){ $("#qaOn").checked = st.auto_qa; syncQa(); }
+  const live = st.state!=="idle";
+  document.body.classList.toggle("live", live);
+  $("#ctrl").hidden = !live;
+  $("#device").disabled = live;
+  if(live){
+    const [code,...rest] = (st.course||"").split(" ");
+    if(st.device_id) $("#device").value = st.device_id;
+    $("#courseNow").innerHTML = `<b>${esc(code)}</b>${esc(rest.join(" "))}`;
+    base = st.elapsed; t0 = performance.now();
+    $("#ctrl").classList.toggle("paused", st.state!=="recording");
+    $("#pauseBtn").textContent = st.state==="paused" ? "继续" : "暂停";
+    $("#pauseBtn").disabled = $("#stopBtn").disabled = st.state==="saving";
+    $("#stopBtn").textContent = st.state==="saving" ? "正在保存…" : "下课，保存笔记";
+    clearInterval(tick);
+    const draw=()=>{ $("#timer").textContent=fmt(base + (S.state==="recording" ? (performance.now()-t0)/1000 : 0)); };
+    draw(); tick=setInterval(draw,500);
+  } else {
+    clearInterval(tick);
+    $("#trans").innerHTML = `<div class="empty" id="transEmpty">等老师开口…</div>`;
+    $("#summary").innerHTML = `<div class="empty">讲过一段内容后，这里会按主题出现要点。</div>`;
+    $("#qa").innerHTML = `<div class="empty" id="qaEmpty">还没有人提问。</div>`;
+    $("#recog").hidden = true;
+    refreshStart();
+  }
+}
+function nearBottom(el){ return el.scrollHeight - el.scrollTop - el.clientHeight < 80; }
+function addSeg(s){
+  if(document.getElementById("s"+s.id)) return;
+  const box=$("#trans"), stick=nearBottom(box); $("#transEmpty")?.remove();
+  box.querySelectorAll(".seg.latest").forEach(x=>x.classList.remove("latest"));
+  const d=document.createElement("div"); d.className="seg latest"; d.id="s"+s.id;
+  d.innerHTML=`<div class="ts">${esc(s.t)}<small>${esc(s.clock)}</small></div><div><div class="en">${esc(s.en)}</div><div class="zh">${esc(s.zh||"")}</div></div>`;
+  box.appendChild(d); if(stick) box.scrollTop=box.scrollHeight;
+}
+function setZh(id, zh){ const e=document.querySelector("#s"+id+" .zh"); if(!e) return; const box=$("#trans"), stick=nearBottom(box); e.textContent=zh; if(stick) box.scrollTop=box.scrollHeight; }
+function renderSummary(items){
+  if(!items||!items.length) return;
+  $("#summary").innerHTML = items.map(sec=>`<div class="sum-sec"><div class="topic">${esc(sec.topic)}</div><ul>`+
+    (sec.points||[]).map(p=>`<li><b>${esc(p.k)}</b>：${esc(p.v)}</li>`).join("")+`</ul></div>`).join("");
+}
+function addQA(q){
+  if(document.getElementById("qa"+q.id)) return; $("#qaEmpty")?.remove();
+  const d=document.createElement("div"); d.className="qa new"; d.id="qa"+q.id;
+  d.innerHTML=`<div class="qh"><span>${esc(q.t)}</span>老师在提问</div><div class="qq">${esc(q.question_zh)}</div><div class="qen">${esc(q.question_en)}</div>
+    <div class="azh">${esc(q.answer_zh)}</div><div class="aen"><span>${esc(q.answer_en)}</span><button type="button">复制</button></div><div class="qf">学习辅助 · 仅供参考</div>`;
+  d.querySelector("button").onclick=e=>{ navigator.clipboard?.writeText(q.answer_en).catch(()=>{}); e.target.textContent="已复制"; };
+  $("#qa").prepend(d); $("#qa").scrollTop=0;
+}
+function syncQa(){ $("#qaCard").classList.toggle("off", !$("#qaOn").checked); }
+$("#qaOn").onchange=()=>{ syncQa(); post("/autoqa",{on:$("#qaOn").checked}); };
+
+const levels = new Array(40).fill(0);
+function drawWave(){
+  const c=$("#wave"); if(c.offsetWidth){ const dpr=devicePixelRatio||1;
+    if(c.width!==c.offsetWidth*dpr){ c.width=c.offsetWidth*dpr; c.height=c.offsetHeight*dpr; }
+    const g=c.getContext("2d"), n=levels.length, w=c.width/n, H=c.height; g.clearRect(0,0,c.width,H);
+    g.fillStyle = S.state==="recording" ? "#2F7BEA" : "#CBD5E1";
+    levels.forEach((v,i)=>{ const h=Math.max(3*dpr, v*H); g.beginPath(); (g.roundRect? g.roundRect(i*w+w*.3,(H-h)/2,w*.4,h,w*.2) : g.rect(i*w+w*.3,(H-h)/2,w*.4,h)); g.fill(); }); }
+  requestAnimationFrame(drawWave);
+}
+drawWave();
+
+async function post(url, body){
+  const r = await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})});
+  const j = await r.json().catch(()=>({})); if(!r.ok && j.msg) toast(j.msg,"error"); return j;
+}
+$("#startBtn").onclick=()=>post("/start",{course:chosen, device_id:$("#device").value});
+$("#pauseBtn").onclick=()=>post("/pause");
+$("#stopBtn").onclick=()=>{ if(confirm("下课了？结束录制并保存笔记。")) post("/stop"); };
+
+function connect(){
+  const es = new EventSource("/stream");
+  es.onmessage = e=>{
+    const m = JSON.parse(e.data);
+    if(m.type==="state"){ const was=S.state; applyState({...S,...m}); if(was!==m.state) loadBalance(true); }
+    else if(m.type==="seg") addSeg(m);
+    else if(m.type==="seg_zh") setZh(m.id, m.zh);
+    else if(m.type==="summary") renderSummary(m.items);
+    else if(m.type==="qa") addQA(m);
+    else if(m.type==="level"){ levels.shift(); levels.push(m.v); }
+    else if(m.type==="recognizing") $("#recog").hidden = !(m.on && S.state!=="idle");
+    else if(m.type==="status"){ toast(m.msg, m.level); if(/就绪/.test(m.msg)){ S.model_ready=true; refreshStart(); } }
+    else if(m.type==="saved"){ toast("笔记已保存："+m.path, "ok", m.uri); loadBalance(true); }
+  };
+  es.onerror = ()=>{ es.close(); toast("和后台断开了，3 秒后重连…","error"); setTimeout(connect,3000); };
+}
+async function loadBalance(force){
+  try{
+    const b = await (await fetch("/balance"+(force?"?force=1":""))).json();
+    if(!b.ok){ $("#balV").textContent="查不到"; return; }
+    const sym = b.currency==="CNY" ? "¥" : "$";
+    $("#balV").textContent = sym + b.total.toFixed(2) + (b.session_used!=null ? ` · 本节 ${sym}${b.session_used.toFixed(2)}` : "");
+    $("#bal").classList.toggle("low", b.total < 5 || !b.available);
+    $("#bal").title = !b.available ? "余额不足，翻译和总结会停，去 platform.deepseek.com 充值" : "DeepSeek 余额，点一下刷新";
+  }catch(e){ $("#balV").textContent="查不到"; }
+}
+$("#bal").onclick=()=>loadBalance(true);
+setInterval(()=>loadBalance(false),120000);
+loadConfig().then(()=>{ loadBalance(true); connect(); });
+</script>
+</body>
+</html>
