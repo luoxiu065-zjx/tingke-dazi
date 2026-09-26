@@ -290,28 +290,66 @@ AUTO_QA = {"on": os.getenv("AUTO_QA", "0") == "1"}   # 默认关闭:学习辅助
 QA = []                      # [{id, seg_id, t, question_en, question_zh, answer_zh, answer_en}]
 qa_q = queue.Queue()
 PREP = {"text": os.getenv("COURSE_NOTES", "")}   # 可选:课前资料文字,给提问提醒当背景
-_FILLER = re.compile(r"^(right|okay|ok|yeah|yes|no|good|alright|isn.t it|you know|is it|does that make sense|any questions|so|huh|hm+)$", re.I)
-_TAGQ = re.compile(r"[,.]?\s*(right|okay|ok|yeah|isn.t it|you know|no)\?$", re.I)
+# 第一道筛(规则,免费)只管「别漏」,真假交给 DeepSeek 判。2026-09-26 按 9/24-9/25 真实课堂转写重调(评测见 qa-eval/报告.md):
+# Whisper 常把口头问句转成句号结尾;同学提问常以 ", right?" 收尾;老师也常用 "who can give me…" 这种不带问号的邀请。
+_Q_LEAD = r"(?:(?:so|and|but|okay|ok|right|well|now|then|yes|yeah|alright|all right|um+|uh+|er+|like|sorry|actually|also)[,\s]+)*"
+_WH_Q = re.compile(r"^" + _Q_LEAD + r"(?:(?:what|why|how|who|where|when)(?:'s|'re|\s+(?:is|are|was|were|do|does|did|can|could|would|should|will|might|about|if|else|kind|way|sort|type|exactly)\b)"
+                   r"|which\s+(?:one|ones|way|of|do|does|did|can|could|would|should)\b"
+                   r"|(?:how|what)\s+(?:many|much|long|often|far)\s+(?!you\b|we\b|i\b|they\b|it\b)\w+\s+(?:is|are|do|does|did|can|could|would|should|will|have|has)\b)", re.I)
+_AUX_Q = re.compile(r"^" + _Q_LEAD + r"(?:can|could|would|will|do|does|did|is|are|was|were|should|shall|have|has|may|might|isn't|aren't|don't|doesn't|didn't|wouldn't|couldn't|can't)"
+                    r"\s+(?:you|we|i|they|he|she|there|anyone|anybody|someone|somebody|everyone|everybody|any)\b", re.I)
+_AUX_ANY = re.compile(r"^" + _Q_LEAD + r"(?:can|could|would|will|do|does|did|is|are|was|were|should|shall|have|has)\s+(?:it|this|that|these|those)\b", re.I)
+_QA_CUE = re.compile(r"\b(?:anyone|anybody|any ideas?|what do you think|who can|who wants|can someone|can somebody|could someone|could somebody"
+                     r"|can you (?:tell|give|guess|think|answer|explain|see|say|name)|give me (?:another|a|an|one|some|the)|(?:have|take) a guess|any guesses"
+                     r"|i have a question|my question|question for you|i want to know|i was wondering|i'm wondering|what if|how come)\b", re.I)
+_FILLER = re.compile(r"^(?:" + _Q_LEAD + r")?(?:right|okay|ok|yeah|yes|no|good|alright|isn.t it|you know|is it|does that make sense|makes sense|any questions|anything else"
+                     r"|is that clear|is that ok|is that okay|all good|everyone ok|everybody ok|so|huh|hm+|sorry|pardon|really|yes please)$", re.I)
+_TAGQ = re.compile(r"[,.]?\s*(?:right|okay|ok|yeah|isn.t it|you know|no|yes|don't we|don't you|isn't it|aren't they|can't we)\?$", re.I)
+_ORG_Q = re.compile(r"\b(?:can you (?:all )?(?:hear|see) (?:me|this|that|it|the (?:screen|slides?))|is (?:the|my) (?:mic|microphone|sound)|can everyone (?:hear|see))\b", re.I)
+_QA_MORE = re.compile(r"\b(?:question|wondering|want to know)\b|[-—…]\s*$", re.I)   # 问题多半还在下一段:同学先说 "I have a question…",或这句被切断
 
 def looks_like_question(text):
-    """第一道筛（规则，免费）：有以？结尾、4 个词以上、不是 right?/okay? 这类口头禅的句子。真假交给 DeepSeek 判。"""
-    for s in re.split(r"(?<=[?.!])\s+", text):
+    """第一道筛:宁多勿漏。① 以 ? 结尾、3 词以上、不是口头禅;带 right?/okay? 尾巴的,只有倒装/疑问词开头才算
+    ② 没有问号但以疑问词+助动词(what is / how do / why would…)或倒装(can you / do we / is there…)开头
+    ③ 含邀请回答的说法(anyone / who can / give me another / what do you think / I have a question…)"""
+    for s in re.split(r"(?<=[?.!…])\s+|\s*[—–]\s*|\s*…\s*", text):
         s = s.strip()
-        if s.endswith("?") and len(s.split()) >= 4 and not _FILLER.match(s.strip(" ,.?").lower()) and not _TAGQ.search(s):
-            return True
-    return False
+        core = s.strip(" ,.?!-…").lower()
+        n = len(core.split())
+        if not core or _FILLER.match(core) or _ORG_Q.search(s):
+            continue
+        if s.endswith("?"):
+            if not _TAGQ.search(s):
+                if n >= 3:
+                    return True
+            elif n >= 5 and (_AUX_ANY.search(s) or _AUX_Q.search(s) or _WH_Q.search(s)):
+                return True                      # "Is this the same as X, right?" 学生确认式提问
+        if n >= 3 and (_WH_Q.search(s) or _AUX_Q.search(s)):
+            return True                          # Whisper 把问句转成了句号结尾
+    return bool(_QA_CUE.search(text))
 
 def qa_worker():
     last_answered = 0.0
     while True:
-        sid = qa_q.get()
+        sid = first = qa_q.get()
+        t_start = time.time()
         time.sleep(4)                                   # 等老师把问题说完(常常跨两句)
-        while not qa_q.empty():                         # 这几秒里又冒出的候选,合并成一次
-            sid = max(sid, qa_q.get_nowait())
+        # 再等后面的转写到齐:问题常被切成两段,只看候选那一段 DeepSeek 会判否(9/25 COMP6203 同学提问就这样漏的)
         with history_lock:
-            before = [h for h in history if h["id"] < sid][-10:]
-            focus = [h for h in history if sid <= h["id"] <= sid + 2]
-        if not focus or (time.time() - last_answered < 8 and QA and QA[-1]["seg_id"] >= sid - 2):
+            txt = next((h["en"] for h in history if h["id"] == sid), "")
+        need, limit = (2, 20) if _QA_MORE.search(txt) else (1, 8)
+        while True:
+            while not qa_q.empty():                     # 这几秒里又冒出的候选,合并成一次
+                sid = max(sid, qa_q.get_nowait())
+            with history_lock:
+                last_id = history[-1]["id"] if history else 0
+            if last_id >= sid + need or time.time() - t_start >= limit:
+                break
+            time.sleep(0.5)
+        with history_lock:
+            focus = [h for h in history if first <= h["id"] <= sid + 2][-6:]
+            before = [h for h in history if focus and h["id"] < focus[0]["id"]][-10:]
+        if not focus or (time.time() - last_answered < 8 and QA and QA[-1]["seg_id"] >= first - 2):
             continue
         ctx = before + focus
         transcript = ("【上文，只用来理解，不要判断也不要回答】\n" +
@@ -322,6 +360,8 @@ def qa_worker():
             "你是留学生的课堂学习助手，正在实时听一节英文课（课程：%s）。下面是课堂转写（机器识别，会有听错的词）。\n"
             "只判断【待判断的句子】里是否有**需要回答的真问题**：老师向全班提问、老师点名提问、或同学提了一个值得知道答案的问题。"
             "口头禅(right? okay?)、自问自答后老师马上说出了答案、修辞性提问、组织课堂的问话(can you hear me? is the mic working? any questions?)都算否。"
+            "注意:转写常把问句识别成句号结尾、或把一个问题切成前后两段;同学提问常以 right? / is it? 结尾求确认,这些都可能是真问题。"
+            "老师说「who can give me…」「you can give me another one」「what do you think」这类邀请回答的句子也算提问。"
             "上文里的问题不算；和已回答过的问题(" + answered.replace("%", "%%") + ")是同一个的也算否。\n"
             "只输出 JSON:{\"is_question\":true/false,\"question_en\":\"问题原句（纠正听错的词）\",\"question_zh\":\"一句中文说明在问什么\","
             "\"answer_zh\":\"中文答案要点，不超过 80 字，带关键公式或术语\",\"answer_en\":\"课堂上能直接说出口的英文回答：1-2 句、不超过 35 个词、口语化，先说结论\"}。\n"
