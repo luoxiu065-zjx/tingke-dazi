@@ -71,6 +71,10 @@ venv\Scripts\python tests\test_session.py     # 其余 tests\test_*.py 同理,�
 
 `启动.bat` 会优先用 `python\`（安装包），其次用 `venv\`。`app.py --no-audio` 只起网页、不加载模型；网址加 `?preview=1` 是假数据预览，用于改界面。
 
+## 手机 / 平板网页版（测试中）
+
+没带电脑、只有手机或平板时用的版本,在 [`phone/`](phone/README.md):手机浏览器打开网页、录老师的声音,识别(Groq)和翻译总结(DeepSeek)在**你自己的服务器**上做,下课存成同样格式的笔记。设计为一个人用,想用请自己部署一份(约 15 分钟,README 里有步骤)。作者托管的公开版还在小范围测试,想试的在 issue 里留言。
+
 ## 致谢与灵感来源
 
 产品形态受 Coursedude（coursedude.ai）启发：先选课、再录制、下课自动整理。本项目代码全部自写，界面自行设计，与 Coursedude 无关联，也不是其替代品；非商业，个人学习用。
