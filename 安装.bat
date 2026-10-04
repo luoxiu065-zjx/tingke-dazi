@@ -36,9 +36,8 @@ if %errorlevel%==0 (
 if not exist .env copy .env.example .env >nul
 echo.
 echo [4/4] 安装完成!
-echo 下一步:在弹出的记事本里填 DEEPSEEK_API_KEY=你的Key,保存,然后双击「启动.bat」。
+echo 下一步:双击「启动.bat」,在网页左下角「设置」里贴上你的 DeepSeek Key,点「测试连接」通了就保存。
 echo 第一次启动会自动下载语音模型,约 1.6GB,需要等一会儿。
-start "" notepad .env
 pause
 exit /b 0
 

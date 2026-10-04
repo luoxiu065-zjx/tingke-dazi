@@ -4,8 +4,17 @@ venv/
 models/
 课堂记录/
 课堂记录备份/
+课件/
+问答/
+session/
+profile/*
+!profile/我.example.md
+!profile/学习状态.example.md
+!profile/README.txt
 live.md
 live.md.tmp
+lecture_index.json
+待上传/
 __pycache__/
 *.pyc
 *.bak*

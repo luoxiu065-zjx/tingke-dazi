@@ -1,0 +1,6 @@
+# COMP6231 Foundations of AI 术语
+Watson, Russell and Norvig, Turing test, Searle, Chinese Room, strong AI, weak AI,
+depth-first search, breadth-first search, iterative deepening, heuristic, A-star, admissible heuristic, branch and bound,
+production rules, non-monotonic logic, semantic network, description logic, first-order logic, inference,
+Bayesian network, belief propagation, conditional probability, Bayes' rule,
+supervised learning, unsupervised learning, reinforcement learning, ID3, decision tree, entropy, information gain

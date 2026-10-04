@@ -1,0 +1,4 @@
+# ECSP6002 Research Methods 术语
+Green, literature review, research question, hypothesis, methodology, quantitative, qualitative,
+experimental design, simulation, data collection, statistical analysis, significance, p-value,
+project plan, Gantt chart, risk analysis, dissertation, citation, Harvard referencing, plagiarism, Turnitin
