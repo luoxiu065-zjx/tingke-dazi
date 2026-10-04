@@ -4,17 +4,19 @@
 # 原始仓库:https://github.com/luoxiu065-zjx/tingke-dazi
 # 转载、二次发布请保留本版权声明和原作者署名。build: tkdz-1bf2795e
 # ------------------------------------------------------------------
-"""听课搭子 · 手机 / 平板网页版后端(跑在你自己的服务器上)
+"""听课搭子 · 手机 / 平板网页版后端(多人版)
 
 手机浏览器录麦克风 → 按停顿切成小段上传 → Groq whisper-large-v3-turbo 转写 → DeepSeek 翻译/总结/答疑
-→ SSE 推回手机 → 结束时把记录写成 Markdown 放进 RECORDS_DIR(建议指到你自己的同步目录,手机、电脑都会收到)。
-设计为一个人用:同一时刻只有一节课在录;断网/关页面不影响,重开页面自动接上。
+→ SSE 推回手机 → 结束时写成 Markdown:托管 WebDAV(/udav/<uid>/)或他自己的 WebDAV,本地也留 7 天可下载。
+每个用户一把钥匙、自己的 key、自己的课程表;每人同一时刻录一节课,不同用户互不影响。
+没填 key 的新用户可用 .env 里的公共 key 试用 TRIAL_SECONDS 秒(不想开放试用就把 GROQ_API_KEY 留空)。断网/关页面不影响,重开页面自动接上。
 """
 import os, sys, io, json, time, queue, threading, re, glob, datetime, uuid, subprocess, shutil, traceback
 from flask import Flask, request, jsonify, Response, send_from_directory
 from dotenv import load_dotenv
 from openai import OpenAI
-import engine, textkit
+import engine, textkit, users as usersmod
+from flask import g, abort, send_file
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(BASE, ".env"))
@@ -24,20 +26,31 @@ GROQ_MODEL = os.getenv("GROQ_MODEL", "whisper-large-v3-turbo")
 DS_KEY = os.getenv("DEEPSEEK_API_KEY", "").strip()
 DS_BASE = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 DS_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
-VAULT = os.getenv("RECORDS_DIR") or os.getenv("VAULT_DIR") or os.path.join(BASE, "records")   # 记录根目录(建议指到你的 Obsidian 同步目录)
+VAULT = os.getenv("VAULT_DIR", os.path.join(BASE, "records", "owner"))         # 部署者自己(owner 账号)的记录目录,建议指到你的 Obsidian 同步目录
+DAV_ROOT = os.getenv("DAV_ROOT", "/srv/udav")                                    # 托管 WebDAV:每个用户一个子目录,nginx /udav/<uid>/ 指到这里
+DAV_AUTH_DIR = os.getenv("DAV_AUTH_DIR", "/srv/udav-auth")                       # 每个用户一份 htpasswd,只给 nginx 读
+PUBLIC_BASE = os.getenv("PUBLIC_BASE_URL", "")                                    # 对外地址,如 https://tingke.example.com(空=按请求的 Host)
 RECORD_SUB = os.getenv("RECORD_SUBDIR", "课堂记录")
 TERM_START = datetime.date.fromisoformat(os.getenv("TERM_START", "2026-09-21"))
-COURSES = [c.strip() for c in os.getenv("COURSES", "COMP0001 示例课程,其他").split(",") if c.strip()]   # 在 .env 里改成你自己的课
+COURSES = [c.strip() for c in os.getenv("COURSES", "COMP0001 示例课程,其他").split(",") if c.strip()]   # owner 账号的课;其他用户在页面里自己填
 PORT = int(os.getenv("PORT", "8095"))
 SUMMARY_EVERY = 40
 DATA = os.path.join(BASE, "data", "sessions"); os.makedirs(DATA, exist_ok=True)
 LOGS = os.path.join(BASE, "logs"); os.makedirs(LOGS, exist_ok=True)
 TERMS_DIR = os.path.join(BASE, "术语")
 
-groq = OpenAI(api_key=GROQ_KEY, base_url="https://api.groq.com/openai/v1",
-              default_headers={"User-Agent": "tingke-dazi-live/0.1"})   # Cloudflare 拦默认 UA(403 错误 1010)
-ds = OpenAI(api_key=DS_KEY, base_url=DS_BASE) if DS_KEY else None
+def groq_client(key):
+    return OpenAI(api_key=key, base_url="https://api.groq.com/openai/v1", default_headers={"User-Agent": "tingke-dazi-live/0.2"})   # Cloudflare 拦默认 UA(403 错误 1010)
+
+
+def ds_client(key, base=None):
+    return OpenAI(api_key=key, base_url=base or DS_BASE) if key else None
+
+
+PUB_GROQ = groq_client(GROQ_KEY) if GROQ_KEY else None     # 公共 key:owner 账号用 + 新用户试用
+PUB_DS = ds_client(DS_KEY)
 app = Flask(__name__, static_folder=None)
+USERS = usersmod.Users(os.path.join(BASE, "data"), DAV_ROOT, DAV_AUTH_DIR, PUBLIC_BASE)
 
 
 def log(msg):
@@ -53,8 +66,8 @@ def log(msg):
         pass
 
 
-def llm(messages, temperature=0.3, max_tokens=800):
-    r = ds.chat.completions.create(model=DS_MODEL, messages=messages, temperature=temperature, max_tokens=max_tokens, stream=False)
+def llm_with(client, model, messages, temperature=0.3, max_tokens=800):
+    r = client.chat.completions.create(model=model, messages=messages, temperature=temperature, max_tokens=max_tokens, stream=False)
     return r.choices[0].message.content.strip()
 
 
@@ -70,11 +83,11 @@ def course_terms(course):
         return ""
 
 
-def prev_lesson_text(course):
-    """上节课讲到哪:记录目录里这门课最新的一条记录(AI 总结那节)。"""
+def prev_lesson_text(user, course):
+    """上节课讲到哪:这个用户记录目录里这门课最新的一条记录(AI 总结那节)。"""
     code = engine.course_code(course)
     out = []
-    folder = os.path.join(VAULT, *RECORD_SUB.split("/"), code)
+    folder = USERS.record_targets(user, RECORD_SUB, engine.safe_name(code))[0]
     files = [f for f in glob.glob(os.path.join(folder, "*.md")) if "整合笔记" not in os.path.basename(f)]
     if files:
         latest = max(files)
@@ -97,9 +110,16 @@ def forever(fn):
 
 # ---------------- 会话 ----------------
 class Session:
-    def __init__(self, course, start=None, sid=None, restore=None):
+    def __init__(self, user, course, start=None, sid=None, restore=None):
         self.sid = sid or uuid.uuid4().hex[:10]
+        self.user = user; self.uid = user["uid"]
         self.course = course
+        # 模型客户端:有自己的 key 用自己的;没有就用公共 key 试用(owner 账号无限制)
+        self.trial = not user.get("owner") and not user.get("groq_key")
+        self.groq = groq_client(user["groq_key"]) if user.get("groq_key") else PUB_GROQ
+        self.ds = ds_client(user["ds_key"], user.get("ds_base")) if user.get("ds_key") else (PUB_DS if (user.get("owner") or self.trial) else None)
+        self.ds_model = user.get("ds_model") or DS_MODEL
+        self.trial_warned = False
         self.start = start or datetime.datetime.now()
         self.state = "recording"
         self.rows, self.summary, self.upto, self.qa = [], [], 0, []
@@ -123,9 +143,12 @@ class Session:
                          (self.qa_worker, "qa"), (self.persist_worker, "persist")):
             threading.Thread(target=forever(fn), daemon=True, name="%s-%s" % (name, self.sid)).start()
 
+    def llm(self, messages, temperature=0.3, max_tokens=800):
+        return llm_with(self.ds, self.ds_model, messages, temperature, max_tokens)
+
     def _load_prev(self):
         try:
-            self.prev = prev_lesson_text(self.course)
+            self.prev = prev_lesson_text(self.user, self.course)
         except Exception as e:
             log("[warn] 读上节课失败:%s" % e)
 
@@ -173,8 +196,18 @@ class Session:
             prev = " ".join(h["en"] for h in self.rows[-3:])
         prev = re.sub(r"(\s*\.){2,}", ".", prev); prev = re.sub(r"\s+", " ", prev).strip()[-200:]
         prompt = (("University lecture. Terms: %s. " % self.terms[:350]) if self.terms else "University lecture. ") + prev
+        if self.groq is None:
+            if not self.trial_warned:
+                self.trial_warned = True; self.status("还没填 Groq key,识别不了。到设置里填一下", "error")
+            return
+        if self.trial:
+            if not USERS.trial_ok(self.user, dur):
+                if not self.trial_warned:
+                    self.trial_warned = True; self.status("试用额度用完了。到设置里填自己的 Groq 和 DeepSeek key(都免费申请),就能继续", "error")
+                return
+            USERS.trial_add(self.user, dur)
         try:
-            r = groq.audio.transcriptions.create(file=("chunk." + ext, data), model=GROQ_MODEL, language="en",
+            r = self.groq.audio.transcriptions.create(file=("chunk." + ext, data), model=GROQ_MODEL, language="en",
                                                  prompt=prompt.strip(), response_format="verbose_json", temperature=0)
             segs = getattr(r, "segments", None) or []
             if segs:
@@ -193,14 +226,14 @@ class Session:
             row = {"id": self.seg, "t": engine.fmt_t(t0), "clock": datetime.datetime.now().strftime("%H:%M:%S"), "en": text, "zh": ""}
             self.rows.append(row)
         self.publish(dict(type="seg", **row)); self.dirty.set()
-        if ds and engine.looks_like_question(text):
+        if self.ds and engine.looks_like_question(text):
             self.qaq.put(row["id"])
-        if ds:
+        if self.ds:
             self.tq.put(row)
 
     # --- 翻译 ---
     def translate_worker(self):
-        if not ds:
+        if not self.ds:
             return
         while True:
             item = self.tq.get()
@@ -216,7 +249,7 @@ class Session:
             done = {}
             if len(batch) > 1:
                 try:
-                    raw = llm([{"role": "system", "content": sys_msg + "\n用户会给编号的多句,逐句翻译,输出 JSON 数组:[{\"i\":编号,\"zh\":\"译文\"}],只输出 JSON。"},
+                    raw = self.llm([{"role": "system", "content": sys_msg + "\n用户会给编号的多句,逐句翻译,输出 JSON 数组:[{\"i\":编号,\"zh\":\"译文\"}],只输出 JSON。"},
                                {"role": "user", "content": textkit.batch_prompt(batch)}], temperature=0.2, max_tokens=400 * len(batch))
                     done = textkit.parse_batch(raw, batch)
                 except Exception:
@@ -225,7 +258,7 @@ class Session:
                 zh = done.get(it["id"])
                 if not zh:
                     try:
-                        zh = llm([{"role": "system", "content": sys_msg}, {"role": "user", "content": it["en"]}], temperature=0.2, max_tokens=400)
+                        zh = self.llm([{"role": "system", "content": sys_msg}, {"role": "user", "content": it["en"]}], temperature=0.2, max_tokens=400)
                     except Exception:
                         zh = "(翻译失败)"
                 with self.lock:
@@ -235,7 +268,7 @@ class Session:
 
     # --- 总结 ---
     def update_summary(self):
-        if not ds:
+        if not self.ds:
             return False
         with self.lock:
             new = [h for h in self.rows if h["id"] > self.upto]
@@ -243,7 +276,7 @@ class Session:
         if not new:
             return False
         try:
-            raw = llm([{"role": "user", "content": engine.summary_prompt(items, new)}], temperature=0.3, max_tokens=3000)
+            raw = self.llm([{"role": "user", "content": engine.summary_prompt(items, new)}], temperature=0.3, max_tokens=3000)
         except Exception:
             return False
         got = engine.parse_json(raw, "[")
@@ -285,7 +318,7 @@ class Session:
             if not focus or (time.time() - self.last_answered < 8 and self.qa and self.qa[-1]["seg_id"] >= first - 2):
                 continue
             try:
-                j = engine.parse_json(llm([{"role": "user", "content": engine.qa_prompt(self.course, self.terms, self.prev, notes, before, focus, answered)}],
+                j = engine.parse_json(self.llm([{"role": "user", "content": engine.qa_prompt(self.course, self.terms, self.prev, notes, before, focus, answered)}],
                                           temperature=0.2, max_tokens=700), "{")
             except Exception as e:
                 log("[qa] 出错:%s" % e); continue
@@ -301,7 +334,7 @@ class Session:
     # --- 落盘 ---
     def snapshot(self):
         with self.lock:
-            return {"sid": self.sid, "course": self.course, "start": self.start.isoformat(timespec="seconds"), "state": self.state,
+            return {"sid": self.sid, "uid": self.uid, "course": self.course, "start": self.start.isoformat(timespec="seconds"), "state": self.state,
                     "elapsed": self.elapsed, "next_seq": self.next_seq, "rows": [dict(r) for r in self.rows],
                     "summary": list(self.summary), "upto": self.upto, "qa": list(self.qa),
                     "saved_at": datetime.datetime.now().isoformat(timespec="seconds")}
@@ -341,36 +374,58 @@ class Session:
             rows = list(self.rows); items = list(self.summary); qa = list(self.qa)
         dur = engine.fmt_t(self.elapsed)
         title = "简短录音" if len(rows) < 8 else "课堂记录"
-        if ds and len(rows) >= 8:
+        if self.ds and len(rows) >= 8:
             try:
                 title = engine.sane_title(llm([{"role": "user", "content": engine.title_prompt(engine.summary_md(items) or "\n".join(h["en"] for h in rows))}],
                                               temperature=0.2, max_tokens=60))
             except Exception:
                 pass
         code = engine.course_code(self.course)
-        folder = os.path.join(VAULT, *RECORD_SUB.split("/"), engine.safe_name(code))
         stem = "%s %s %s" % (self.start.strftime("%Y-%m-%d %H%M"), code, engine.safe_name(title))
-        fpath = os.path.join(folder, stem + ".md")
         md = engine.record_md(self.course, self.start, end, dur, title, items, qa, rows)
-        try:
-            os.makedirs(folder, exist_ok=True)
-            with open(fpath, "w", encoding="utf-8") as f:
-                f.write(md)
-            os.chmod(fpath, 0o664)
-        except Exception as e:
-            # 写不进同步目录(权限/磁盘):别丢数据,留着落盘文件,重启后会再试
+        targets = USERS.record_targets(self.user, RECORD_SUB, engine.safe_name(code))
+        fpath = None; written = []
+        for k, folder in enumerate(targets):
+            p = os.path.join(folder, stem + ".md")
+            try:
+                os.makedirs(folder, exist_ok=True)
+                with open(p, "w", encoding="utf-8") as f:
+                    f.write(md)
+                os.chmod(p, 0o664)
+                written.append(p)
+                if fpath is None:
+                    fpath = p
+            except Exception as e:
+                log("[%s] 写 %s 失败:%s" % (self.sid, folder, str(e)[:160]))
+                if k == 0 and len(targets) == 1:
+                    # 唯一的目标都写不进去:别丢数据,留着落盘文件,重启后会再试
+                    self.state = "paused"; self.persist()
+                    self.status("保存失败:%s。转写没丢,修好后重启会自动补存" % str(e)[:120], "error")
+                    log("[%s] 保存失败:\n%s" % (self.sid, traceback.format_exc()))
+                    return
+        if fpath is None:
             self.state = "paused"; self.persist()
-            self.status("保存失败:%s。转写没丢,修好后重启会自动补存" % str(e)[:120], "error")
-            log("[%s] 保存失败:\n%s" % (self.sid, traceback.format_exc()))
-            return
-        rel = os.path.relpath(fpath, VAULT).replace("\\", "/")
+            self.status("保存失败,转写没丢,修好后重启会自动补存", "error"); return
+        mode = self.user["sync"].get("mode")
+        if mode == "owner":
+            rel = os.path.relpath(fpath, VAULT).replace("\\", "/"); where = "Obsidian " + rel
+        elif mode == "hosted":
+            rel = os.path.relpath(fpath, USERS.hosted_dir(self.user)).replace("\\", "/"); where = "你的同步文件夹 " + rel + "(手机 Obsidian 同步一下就有)"
+        elif mode == "webdav":
+            try:
+                rel = USERS.push_webdav(self.user, RECORD_SUB, engine.safe_name(code), stem + ".md", md); where = "已推到你的网盘 " + rel
+            except Exception as e:
+                rel = stem + ".md"; where = "推到网盘失败(%s),已留在服务器,可在「我的记录」里下载" % str(e)[:80]
+                log("[%s] webdav push 失败:%s" % (self.sid, e))
+        else:
+            rel = stem + ".md"; where = "已留在服务器,可在「我的记录」里下载"
         self.state = "saved"
         try:
             os.remove(os.path.join(DATA, self.sid + ".json"))
         except Exception:
             pass
-        self.publish({"type": "saved", "path": rel, "n": len(rows)})
-        log("[%s] 已保存 %s(%d 句)" % (self.sid, rel, len(rows)))
+        self.publish({"type": "saved", "path": rel, "where": where, "n": len(rows), "download": "record?f=" + engine.safe_name(code) + "/" + stem + ".md"})
+        log("[%s] 已保存 %s(%d 句)→ %s" % (self.sid, stem, len(rows), where))
 
 
 
@@ -378,12 +433,17 @@ SESSIONS = {}
 S_LOCK = threading.Lock()
 
 
-def active_session():
+def active_session(uid):
     with S_LOCK:
         for s in SESSIONS.values():
-            if s.state in ("recording", "paused"):
+            if s.uid == uid and s.state in ("recording", "paused"):
                 return s
     return None
+
+
+def my_session(sid):
+    s = SESSIONS.get(sid or "")
+    return s if s and s.uid == g.user["uid"] else None
 
 
 def autosave_unfinished():
@@ -393,7 +453,10 @@ def autosave_unfinished():
             d = json.load(open(p, encoding="utf-8"))
             if d.get("state") not in ("recording", "paused", "saving") or not d.get("rows"):
                 os.remove(p); continue
-            s = Session(d["course"], start=datetime.datetime.fromisoformat(d["start"]), sid=d["sid"], restore=d)
+            u = USERS.get(d.get("uid", "owner")) or USERS.get("owner")
+            if not u:
+                os.remove(p); continue
+            s = Session(u, d["course"], start=datetime.datetime.fromisoformat(d["start"]), sid=d["sid"], restore=d)
             with S_LOCK:
                 SESSIONS[s.sid] = s
             log("[*] 上次 %s 没正常结束(%d 句),自动保存" % (d["course"], len(d["rows"])))
@@ -403,17 +466,17 @@ def autosave_unfinished():
 
 
 # ---------------- 接口 ----------------
-def authed():
-    k = request.args.get("k") or request.form.get("k") or (request.get_json(silent=True) or {}).get("k")
-    return bool(TOKEN) and k == TOKEN
+OPEN_PATHS = ("/live", "/live/index.html", "/live/health", "/live/register")
 
 
 @app.before_request
 def _auth():
-    if request.path.rstrip("/") in ("/live/health",):
+    if request.path.rstrip("/") in OPEN_PATHS or request.path.startswith("/live/static/"):
         return None
-    if not authed():
-        return jsonify({"ok": False, "msg": "没有钥匙"}), 401
+    k = request.args.get("k") or request.form.get("k") or (request.get_json(silent=True) or {}).get("k")
+    g.user = USERS.get_by_key(k)
+    if not g.user:
+        return jsonify({"ok": False, "msg": "钥匙不对或已失效"}), 401
 
 
 @app.route("/live/")
@@ -422,43 +485,157 @@ def index():
     return send_from_directory(os.path.join(BASE, "static"), "index.html")
 
 
+@app.route("/live/static/<path:name>")
+def static_file(name):
+    return send_from_directory(os.path.join(BASE, "static"), name)
+
+
 @app.route("/live/health")
 def health():
-    return jsonify({"ok": True, "active": bool(active_session()), "groq": bool(GROQ_KEY), "deepseek": bool(ds)})
+    return jsonify({"ok": True, "groq": bool(PUB_GROQ), "deepseek": bool(PUB_DS), "users": len(USERS.users)})
+
+
+REG_IP = {}
+
+
+@app.route("/live/register", methods=["POST"])
+def register():
+    ip = request.headers.get("X-Real-IP") or request.remote_addr or "?"
+    day = datetime.date.today().isoformat()
+    n = REG_IP.get((ip, day), 0)
+    if n >= 20:
+        return jsonify({"ok": False, "msg": "今天注册太多次了"}), 429
+    REG_IP[(ip, day)] = n + 1
+    u = USERS.register((request.get_json(silent=True) or {}).get("name", ""))
+    log("[reg] %s from %s" % (u["uid"], ip))
+    return jsonify({"ok": True, "k": u["key"], "uid": u["uid"]})
 
 
 @app.route("/live/config")
 def config():
-    s = active_session()
-    return jsonify({"courses": COURSES, "active": ({"sid": s.sid, "course": s.course, "elapsed": s.elapsed,
-                                                    "start": s.start.strftime("%Y-%m-%d %H:%M")} if s else None)})
+    s = active_session(g.user["uid"])
+    return jsonify({"me": USERS.public(g.user, request.host), "courses": g.user["courses"],
+                    "active": ({"sid": s.sid, "course": s.course, "elapsed": s.elapsed, "start": s.start.strftime("%Y-%m-%d %H:%M")} if s else None)})
+
+
+@app.route("/live/settings", methods=["POST"])
+def settings():
+    USERS.update(g.user, request.get_json(force=True, silent=True) or {})
+    if g.user["sync"].get("mode") == "hosted":
+        try:
+            USERS.ensure_hosted(g.user)
+        except Exception as e:
+            log("[settings] ensure_hosted 失败:%s" % e)
+    return jsonify({"ok": True, "me": USERS.public(g.user, request.host)})
+
+
+@app.route("/live/keys/test", methods=["POST"])
+def keys_test():
+    """填完 key 当场测:groq 列模型,deepseek 发一个字。"""
+    j = request.get_json(force=True, silent=True) or {}
+    out = {}
+    gk = (j.get("groq_key") or "").strip() or g.user.get("groq_key")
+    dk = (j.get("ds_key") or "").strip() or g.user.get("ds_key")
+    if j.get("which", "both") in ("both", "groq"):
+        if not gk:
+            out["groq"] = [False, "没填"]
+        else:
+            try:
+                groq_client(gk).models.list(); out["groq"] = [True, "能用"]
+            except Exception as e:
+                out["groq"] = [False, "不对:%s" % str(e)[:100]]
+    if j.get("which", "both") in ("both", "ds"):
+        if not dk:
+            out["ds"] = [False, "没填"]
+        else:
+            try:
+                llm_with(ds_client(dk, j.get("ds_base") or g.user.get("ds_base")), j.get("ds_model") or g.user.get("ds_model") or DS_MODEL,
+                         [{"role": "user", "content": "回复一个字:好"}], max_tokens=5); out["ds"] = [True, "能用"]
+            except Exception as e:
+                msg = str(e)
+                out["ds"] = [False, "余额不足,去充几块钱" if "402" in msg or "Insufficient" in msg else "不对:%s" % msg[:100]]
+    return jsonify({"ok": True, "result": out})
+
+
+@app.route("/live/sync/test", methods=["POST"])
+def sync_test():
+    j = request.get_json(force=True, silent=True) or {}
+    w = dict(j.get("webdav") or {})
+    if not w.get("pass") and (g.user["sync"].get("webdav") or {}).get("pass"):
+        w["pass"] = g.user["sync"]["webdav"]["pass"]
+    ok, msg = USERS.test_webdav(w)
+    return jsonify({"ok": ok, "msg": msg})
+
+
+@app.route("/live/sync/testnote", methods=["POST"])
+def sync_testnote():
+    """发一份测试笔记到他的同步位置,让他在手机 Obsidian 里确认收到。"""
+    now = datetime.datetime.now()
+    md = "# 听课搭子 测试笔记\n\n%s 发出。你在 Obsidian 里看到这一页,说明同步通了。\n这一页可以删。\n" % now.strftime("%Y-%m-%d %H:%M")
+    fname = "测试 %s.md" % now.strftime("%Y-%m-%d %H%M")
+    mode = g.user["sync"].get("mode")
+    try:
+        if mode == "webdav":
+            rel = USERS.push_webdav(g.user, RECORD_SUB, "测试", fname, md); where = "已推到你的网盘 " + rel
+        else:
+            folder = USERS.record_targets(g.user, RECORD_SUB, "测试")[0]
+            os.makedirs(folder, exist_ok=True)
+            with open(os.path.join(folder, fname), "w", encoding="utf-8") as f:
+                f.write(md)
+            os.chmod(os.path.join(folder, fname), 0o664)
+            where = "已放进你的同步文件夹,手机 Obsidian 同步一下" if mode == "hosted" else "已留在服务器,可在「我的记录」下载"
+        return jsonify({"ok": True, "msg": where})
+    except Exception as e:
+        return jsonify({"ok": False, "msg": "失败:%s" % str(e)[:140]})
+
+
+@app.route("/live/records")
+def records():
+    if g.user.get("owner"):
+        return jsonify({"ok": True, "items": []})
+    return jsonify({"ok": True, "items": USERS.list_local(g.user)})
+
+
+@app.route("/live/record")
+def record():
+    rel = (request.args.get("f") or "").replace("\\", "/")
+    if g.user.get("owner") or not rel or ".." in rel:
+        abort(404)
+    p = os.path.normpath(os.path.join(USERS.local_record_dir(g.user), rel))
+    if not p.startswith(os.path.normpath(USERS.local_record_dir(g.user))) or not os.path.isfile(p):
+        abort(404)
+    return send_file(p, as_attachment=True, download_name=os.path.basename(p), mimetype="text/markdown")
 
 
 @app.route("/live/prev")
 def prev():
     course = request.args.get("course", "")
-    return jsonify({"text": prev_lesson_text(course) if course in COURSES else ""})
+    return jsonify({"text": prev_lesson_text(g.user, course) if course in g.user["courses"] else ""})
 
 
 @app.route("/live/start", methods=["POST"])
 def start():
     course = (request.get_json(force=True, silent=True) or {}).get("course")
-    if course not in COURSES:
+    if course not in g.user["courses"]:
         return jsonify({"ok": False, "msg": "先选是哪门课"}), 400
-    s = active_session()
+    s = active_session(g.user["uid"])
     if s:
         return jsonify({"ok": True, "sid": s.sid, "resumed": True, "course": s.course, "elapsed": s.elapsed})
-    s = Session(course)
+    if not g.user.get("owner") and not g.user.get("groq_key") and not USERS.trial_ok(g.user, 1):
+        return jsonify({"ok": False, "msg": "试用额度用完了,到设置里填自己的 Groq 和 DeepSeek key 再开始"}), 402
+    if not PUB_GROQ and not g.user.get("groq_key"):
+        return jsonify({"ok": False, "msg": "还没填 Groq key"}), 400
+    s = Session(g.user, course)
     with S_LOCK:
         SESSIONS[s.sid] = s
     s.persist()
-    log("[%s] 开始:%s" % (s.sid, course))
-    return jsonify({"ok": True, "sid": s.sid, "resumed": False})
+    log("[%s] 开始:%s(%s%s)" % (s.sid, course, s.uid, " 试用" if s.trial else ""))
+    return jsonify({"ok": True, "sid": s.sid, "resumed": False, "trial": s.trial})
 
 
 @app.route("/live/chunk", methods=["POST"])
 def chunk():
-    s = SESSIONS.get(request.form.get("sid", ""))
+    s = my_session(request.form.get("sid", ""))
     if not s or s.state not in ("recording", "paused"):
         return jsonify({"ok": False, "msg": "这节课已经结束了"}), 410
     f = request.files.get("file")
@@ -475,7 +652,7 @@ def chunk():
 
 @app.route("/live/pause", methods=["POST"])
 def pause():
-    s = SESSIONS.get((request.get_json(force=True, silent=True) or {}).get("sid", ""))
+    s = my_session((request.get_json(force=True, silent=True) or {}).get("sid", ""))
     if not s:
         return jsonify({"ok": False}), 404
     s.state = "paused" if s.state == "recording" else "recording"
@@ -485,7 +662,7 @@ def pause():
 
 @app.route("/live/stop", methods=["POST"])
 def stop():
-    s = SESSIONS.get((request.get_json(force=True, silent=True) or {}).get("sid", ""))
+    s = my_session((request.get_json(force=True, silent=True) or {}).get("sid", ""))
     if not s or s.state not in ("recording", "paused"):
         return jsonify({"ok": False, "msg": "没有在录的课"}), 400
     threading.Thread(target=forever(s.finish), daemon=True).start()
@@ -494,7 +671,7 @@ def stop():
 
 @app.route("/live/stream")
 def stream():
-    s = SESSIONS.get(request.args.get("sid", ""))
+    s = my_session(request.args.get("sid", ""))
     if not s:
         return jsonify({"ok": False}), 404
 
@@ -526,8 +703,11 @@ def stream():
 
 
 if __name__ == "__main__":
-    if not TOKEN:
-        print("[!] .env 里没有 ACCESS_TOKEN,拒绝启动"); sys.exit(1)
+    if TOKEN:
+        USERS.ensure_owner(TOKEN, COURSES, VAULT)      # 部署者自己的账号(owner):链接 /live/?k=ACCESS_TOKEN,记录写进 VAULT_DIR
+    if not PUB_GROQ:
+        print("[!] .env 里没有 GROQ_API_KEY,新用户没法试用(填了自己 key 的照常)")
     threading.Thread(target=forever(autosave_unfinished), daemon=True).start()
+    threading.Thread(target=forever(USERS.cleanup_local), daemon=True).start()
     log("[*] 听课搭子手机版后端启动,端口 %d" % PORT)
     app.run(host="127.0.0.1", port=PORT, threaded=True, use_reloader=False)
