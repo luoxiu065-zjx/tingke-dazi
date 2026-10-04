@@ -239,6 +239,7 @@
     <div class="frow"><label>接口地址</label><input id="stBase" placeholder="https://…"></div>
     <div class="frow"><label>API key <span class="note" id="stKeyNow"></span></label><input id="stKey" type="password" placeholder="粘贴新的 key;留空=沿用现在的" autocomplete="off"></div>
     <div class="frow"><label>模型</label><input id="stModel" list="stModels" placeholder="模型名"><datalist id="stModels"></datalist></div>
+    <div class="frow"><label>手机版链接 <span class="note">用于「移交手机」:在手机版页面复制整条专属链接粘到这里</span></label><input id="stPhone" placeholder="https://…/live/?k=…(没有就留空)" autocomplete="off"></div>
     <div class="mrow"><button class="btn btn-ghost btn-sm" id="stTest">测试连接</button><span class="sp" id="stMsg"></span><button class="btn btn-ghost btn-sm" id="stCancel">取消</button><button class="btn btn-pri btn-sm" id="stSave">保存</button></div>
   </div>
 </div>
@@ -277,6 +278,7 @@
       <div id="recog"><span id="recogText">正在识别中…</span><span id="queues"></span></div>
       <div class="ctx" title="开着:总结、提问回答、AI 问答带上你的档案和这门课的进度;关掉:基本版"><label class="sw"><input type="checkbox" id="ctxOn"><span></span></label>了解我 <small id="ctxInfo"></small><a id="ctxView">看看它知道什么</a></div>
       <button class="btn btn-ghost" id="pauseBtn">❚❚ 暂停</button>
+      <button class="btn btn-ghost" id="handBtn" title="要走了/没电了:把这节课原样移交到手机,接着录">📱 移交手机</button>
       <button class="btn btn-red" id="stopBtn">⏺ 结束录制</button>
     </div>
     <div class="stage">
@@ -480,7 +482,7 @@ function applyState(st){
     base = st.elapsed; t0 = performance.now();
     $("#ctrl").classList.toggle("paused", st.state!=="recording");
     $("#pauseBtn").textContent = st.state==="paused" ? "▶ 继续" : "❚❚ 暂停";
-    $("#pauseBtn").disabled = $("#stopBtn").disabled = st.state==="saving";
+    $("#pauseBtn").disabled = $("#stopBtn").disabled = $("#handBtn").disabled = st.state==="saving";
     $("#stopBtn").textContent = st.state==="saving" ? "保存中…" : "⏺ 结束录制";
     clearInterval(tick);
     const draw=()=>{ const e = base + (S.state==="recording" ? (performance.now()-t0)/1000 : 0); $("#timer").textContent=fmt(e); $("#m-rec").textContent="🕒 已录制 "+fmt(e); };
@@ -586,6 +588,7 @@ drawWave();
 /* ================= 按钮 / 推送 / 余额 ================= */
 $("#startBtn").onclick = ()=>post("/start",{course:chosen, device_id:$("#device").value});
 $("#pauseBtn").onclick = ()=>post("/pause");
+$("#handBtn").onclick = async()=>{ if(!confirm("把这节课移交到手机继续?\n电脑这边会结束(不存库),转写、总结、提问原样带到手机;手机上打开专属链接点「继续」。整节课最后由手机那边存进 Obsidian。")) return; $("#handBtn").disabled=true; const j=await post("/handoff"); $("#handBtn").disabled=false; if(j&&j.ok) alert("已移交("+j.n+" 句)。现在用手机打开你的专属链接,点「继续」。"); };
 $("#stopBtn").onclick  = ()=>{ if(confirm("结束这节课并保存到 Obsidian?")) post("/stop"); };
 $("#refresh").onclick  = loadRecords;
 let recogOn=false, queued=0;
@@ -632,7 +635,7 @@ async function openSettings(){
   ST=await (await fetch("/settings")).json();
   $("#stProv").innerHTML=Object.entries(ST.providers).map(([k,v])=>`<option value="${k}">${esc(v.name)}</option>`).join("");
   $("#stProv").value=ST.provider in ST.providers?ST.provider:"custom";
-  $("#stBase").value=ST.base_url; $("#stModel").value=ST.model; $("#stKey").value="";
+  $("#stBase").value=ST.base_url; $("#stModel").value=ST.model; $("#stKey").value=""; $("#stPhone").value=ST.phone_link||"";
   $("#stKeyNow").textContent=ST.has_key?("现在:"+ST.key_masked):"(还没填)";
   fillProv(false); $("#stMsg").textContent=""; $("#stMsg").className="sp";
   $("#settings").classList.add("on"); setTimeout(()=>$("#stKey").focus(),100);
@@ -644,7 +647,7 @@ function fillProv(apply){
   $("#stKeyUrl").innerHTML=p.key_url?`去哪里拿 key:<a href="${esc(p.key_url)}" target="_blank">${esc(p.key_url)}</a>`:($("#stProv").value==="ollama"?"本机跑模型,不要 key;先装 Ollama 并 pull 一个模型":"填任何 OpenAI 兼容的地址");
 }
 $("#stProv").onchange=()=>fillProv(true);
-function stForm(){ return {provider:$("#stProv").value, base_url:$("#stBase").value, model:$("#stModel").value, api_key:$("#stKey").value, keep_key:!$("#stKey").value}; }
+function stForm(){ return {provider:$("#stProv").value, base_url:$("#stBase").value, model:$("#stModel").value, api_key:$("#stKey").value, keep_key:!$("#stKey").value, phone_link:$("#stPhone").value.trim()}; }
 $("#stTest").onclick=async()=>{ const m=$("#stMsg"); m.className="sp"; m.textContent="测试中…"; $("#stTest").disabled=true; const j=await post("/settings/test",stForm()); $("#stTest").disabled=false;
   if(j.ok){ m.className="sp ok"; m.textContent=`通了,${j.ms} ms,模型回:${j.reply}`; } else { m.className="sp err"; m.textContent=j.msg||"失败"; } };
 $("#stSave").onclick=async()=>{ const m=$("#stMsg"); const j=await post("/settings",stForm()); if(j.ok){ $("#settings").classList.remove("on"); loadBalance(true); } else { m.className="sp err"; m.textContent=j.msg||"保存失败"; } };

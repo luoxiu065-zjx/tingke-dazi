@@ -9,7 +9,7 @@
 声音来源可选:麦克风(线下课)/ 电脑播放的声音(网课、录播)
 每识别一句就刷新 live.md,Claude 读它就能实时知道课上在讲什么、老师问了什么。
 """
-import os, sys, json, time, queue, threading, re, glob, webbrowser, datetime, shutil, urllib.parse, traceback
+import os, sys, json, time, queue, threading, re, glob, webbrowser, datetime, shutil, urllib.parse, urllib.request, urllib.error, traceback
 
 # pip 装的 CUDA 库(nvidia-cublas/cudnn)在 venv 里,要同时加进 DLL 搜索目录和 PATH,否则 cuda 模式找不到 cublas64_12.dll
 for _d in glob.glob(os.path.join(sys.prefix, "Lib", "site-packages", "nvidia", "*", "bin")):
@@ -42,6 +42,7 @@ import context_pack         # 「了解我」上下文包(2026-10-04)
 BASE = os.path.dirname(os.path.abspath(__file__))
 LIVE_FILE  = os.path.join(BASE, "live.md")                 # 给 Claude 读的实时转录
 BACKUP_DIR = os.path.join(BASE, "课堂记录备份")              # 上次没正常结束的 live.md 挪到这里
+PHONE_LINK = os.getenv("PHONE_LINK", "").strip()             # 手机版专属链接(https://…/live/?k=…),用于「移交手机」
 
 def detect_device():
     """有 NVIDIA 显卡 → cuda + large-v3-turbo(实测约占 2.3GB 显存);没有 → CPU + small.en(慢一些、准确率低一些)。
@@ -1114,7 +1115,7 @@ ENV_PATH = os.path.join(BASE, ".env")
 def settings_get():
     prov = os.getenv("LLM_PROVIDER") or llmcfg.guess_provider(DEEPSEEK_BASE)
     return jsonify({"provider": prov, "base_url": DEEPSEEK_BASE, "model": DEEPSEEK_MODEL, "key_masked": llmcfg.mask(DEEPSEEK_KEY),
-                    "has_key": bool(DEEPSEEK_KEY), "enabled": TRANSLATE_ENABLED,
+                    "has_key": bool(DEEPSEEK_KEY), "enabled": TRANSLATE_ENABLED, "phone_link": PHONE_LINK,
                     "providers": {k: {kk: vv for kk, vv in v.items()} for k, v in llmcfg.PROVIDERS.items()}})
 
 @app.route("/settings/test", methods=["POST"])
@@ -1138,14 +1139,18 @@ def settings_test():
 @app.route("/settings", methods=["POST"])
 def settings_save():
     """保存到 .env 并热生效(翻译/总结/问答下一次调用起用新模型)。"""
-    global DEEPSEEK_KEY, DEEPSEEK_BASE, DEEPSEEK_MODEL
+    global DEEPSEEK_KEY, DEEPSEEK_BASE, DEEPSEEK_MODEL, PHONE_LINK
     d = request.get_json(force=True, silent=True) or {}
     prov, base_url, model = d.get("provider", "custom"), (d.get("base_url") or "").strip().rstrip("/"), (d.get("model") or "").strip()
     key = (d.get("api_key") or "").strip() or (DEEPSEEK_KEY if d.get("keep_key") else "")
     err = llmcfg.validate(prov, base_url, model, key)
     if err:
         return jsonify({"ok": False, "msg": err}), 400
-    llmcfg.write_env(ENV_PATH, {"LLM_PROVIDER": prov, "DEEPSEEK_API_KEY": key, "DEEPSEEK_BASE_URL": base_url, "DEEPSEEK_MODEL": model})
+    if "phone_link" in d:
+        PHONE_LINK = (d.get("phone_link") or "").strip()
+        if PHONE_LINK and not re.match(r"^https?://\S+[?&]k=\S+$", PHONE_LINK):
+            return jsonify({"ok": False, "msg": "手机版链接格式不对,应该是 https://…/live/?k=…(从手机版页面复制整条链接)"}), 400
+    llmcfg.write_env(ENV_PATH, {"LLM_PROVIDER": prov, "DEEPSEEK_API_KEY": key, "DEEPSEEK_BASE_URL": base_url, "DEEPSEEK_MODEL": model, "PHONE_LINK": PHONE_LINK})
     os.environ["LLM_PROVIDER"] = prov
     DEEPSEEK_KEY, DEEPSEEK_BASE, DEEPSEEK_MODEL = key, base_url, model
     build_llm()
@@ -1153,6 +1158,65 @@ def settings_save():
     status("模型设置已保存:%s · %s,下一次调用起生效" % (llmcfg.PROVIDERS.get(prov, {}).get("name", prov), model), "ok")
     publish({"type": "state", **public_state()})
     return jsonify({"ok": True, "enabled": TRANSLATE_ENABLED})
+
+@app.route("/handoff", methods=["POST"])
+def handoff():
+    """把正在录的这节课原样移交给手机版:转写/总结/提问 POST 过去,电脑这边结束但不存库(手机那边最后一起存),只留一份备份。"""
+    link = ((request.get_json(force=True, silent=True) or {}).get("link") or PHONE_LINK).strip()
+    if not link:
+        return jsonify({"ok": False, "msg": "先在「设置」里填手机版专属链接"}), 400
+    with state_lock:
+        if STATE["state"] not in ("recording", "paused"):
+            return jsonify({"ok": False, "msg": "没有在录的课"}), 400
+        course, start = STATE["course"], STATE["start"]
+        if STATE["state"] == "recording":
+            STATE["elapsed_base"] += time.time() - STATE["resume_t"]
+        STATE.update(state="paused", resume_t=None, gen=STATE["gen"] + 1)     # 先停收音,把队列里的最后几句识别完
+    publish({"type": "state", **public_state()})
+    t_end = time.time() + 10
+    while time.time() < t_end and (audio_q.qsize() or text_q.qsize()):
+        time.sleep(0.3)
+    el = elapsed()
+    with history_lock:
+        rows = [dict(h) for h in history if not h.get("gap")]
+    payload = {"course": course, "start": start.strftime("%Y-%m-%d %H:%M:%S"), "elapsed": round(el, 1), "rows": rows,
+               "summary": list(SUMMARY["items"]), "upto": SUMMARY["upto"], "qa": list(QA), "from": "desktop"}
+    base = link.split("?", 1)[0].rstrip("/")
+    if base.endswith("/index.html"):
+        base = base[:-len("/index.html")]
+    k = urllib.parse.parse_qs(urllib.parse.urlparse(link).query).get("k", [""])[0]
+    try:
+        req = urllib.request.Request(base + "/handoff?k=" + urllib.parse.quote(k), data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                                     headers={"Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(req, timeout=40) as r:
+            j = json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        try:
+            j = json.loads(e.read().decode("utf-8"))
+        except Exception:
+            j = {"ok": False, "msg": "手机版服务器回应 %s" % e.code}
+    except Exception as e:
+        j = {"ok": False, "msg": "连不上手机版服务器:%s" % str(e)[:120]}
+    if not j.get("ok"):
+        status("移交失败:%s。这边继续录着,点「继续」" % j.get("msg", ""), "error")
+        return jsonify({"ok": False, "msg": j.get("msg", "移交失败")}), 502
+    # 手机那边收下了:这边结束,不写 Obsidian,留一份备份
+    with state_lock:
+        STATE.update(state="saving", resume_t=None, gen=STATE["gen"] + 1)
+    write_live()
+    try:
+        os.makedirs(BACKUP_DIR, exist_ok=True)
+        bp = os.path.join(BACKUP_DIR, "已移交手机_%s_%s.md" % (course_code(course), datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")))
+        with open(bp, "w", encoding="utf-8") as f:
+            f.write("# %s 已移交手机(%s 句,已录 %s)\n\n" % (course, len(rows), fmt_t(el)) + "\n".join("**%s** %s  \n> %s\n" % (h.get("t", ""), h.get("en", ""), h.get("zh", "")) for h in rows))
+    except Exception as e:
+        log("[warn] 移交备份失败:%s" % e)
+    session.clear()
+    status("已移交到手机(%d 句,%s)。手机上打开你的专属链接,点「继续」接着录;整节课最后由手机那边存进 Obsidian" % (len(rows), fmt_t(el)), "ok")
+    reset_session()
+    publish({"type": "state", **public_state()})
+    return jsonify({"ok": True, "n": len(rows), "elapsed": el})
+
 
 @app.route("/context", methods=["GET"])
 def context_get():

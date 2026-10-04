@@ -173,15 +173,15 @@ class Session:
             self.cv.notify_all()
 
     def chunk_worker(self):
-        while self.state == "recording" or self.chunks:
+        while self.state in ("recording", "paused") or self.chunks:
             with self.cv:
                 deadline = time.time() + 3
-                while self.next_seq not in self.chunks and self.state == "recording":
+                while self.next_seq not in self.chunks and self.state in ("recording", "paused"):
                     if self.chunks and time.time() > deadline:       # 等了 3 秒还没等到前一段:跳过它
                         self.next_seq = min(self.chunks); break
                     self.cv.wait(timeout=0.5)
                 if self.next_seq not in self.chunks:
-                    if self.state != "recording" and not self.chunks:
+                    if self.state not in ("recording", "paused") and not self.chunks:
                         return
                     if self.chunks:
                         self.next_seq = min(self.chunks)
@@ -631,6 +631,37 @@ def start():
     s.persist()
     log("[%s] 开始:%s(%s%s)" % (s.sid, course, s.uid, " 试用" if s.trial else ""))
     return jsonify({"ok": True, "sid": s.sid, "resumed": False, "trial": s.trial})
+
+
+@app.route("/live/handoff", methods=["POST"])
+def handoff():
+    """电脑版把正在录的这节课移交过来:转写/总结/提问原样带上,这边建一节「暂停中」的课;手机打开链接自动接上,点「继续」接着录。"""
+    j = request.get_json(force=True, silent=True) or {}
+    if active_session(g.user["uid"]):
+        return jsonify({"ok": False, "msg": "手机这边已经有一节课在录,先结束它再移交"}), 409
+    course = re.sub(r"\s+", " ", str(j.get("course") or "其他")).strip()[:60]
+    try:
+        start = datetime.datetime.fromisoformat(str(j.get("start", ""))[:19].replace(" ", "T"))
+    except Exception:
+        start = datetime.datetime.now()
+    elapsed = max(0.0, float(j.get("elapsed") or 0))
+    rows = [dict(r) for r in (j.get("rows") or []) if isinstance(r, dict) and r.get("en")]
+    for i, r in enumerate(rows, 1):
+        r.setdefault("id", i); r.setdefault("t", ""); r.setdefault("clock", ""); r.setdefault("zh", "")
+    nid = max([int(r.get("id", 0)) for r in rows] or [0]) + 1
+    rows.append({"id": nid, "t": engine.fmt_t(elapsed), "clock": datetime.datetime.now().strftime("%H:%M:%S"),
+                 "en": "[从电脑版移交到手机,接着录]", "zh": "", "gap": True})
+    restore = {"rows": rows, "summary": j.get("summary") or [], "upto": int(j.get("upto") or 0), "qa": j.get("qa") or [],
+               "elapsed": elapsed, "next_seq": 0}
+    if course not in g.user["courses"]:
+        USERS.update(g.user, {"courses": g.user["courses"] + [course]})
+    s = Session(g.user, course, start=start, restore=restore)
+    s.state = "paused"
+    with S_LOCK:
+        SESSIONS[s.sid] = s
+    s.persist()
+    log("[%s] 从电脑版移交:%s,%d 句,已录 %.0f 秒(%s)" % (s.sid, course, len(rows) - 1, elapsed, s.uid))
+    return jsonify({"ok": True, "sid": s.sid, "n": len(rows) - 1, "elapsed": elapsed})
 
 
 @app.route("/live/chunk", methods=["POST"])
