@@ -277,10 +277,16 @@ class Session:
             return False
         try:
             raw = self.llm([{"role": "user", "content": engine.summary_prompt(items, new)}], temperature=0.3, max_tokens=3000)
-        except Exception:
-            return False
+        except Exception as e:
+            log("[%s][summary] 模型出错:%s" % (self.sid, str(e)[:160])); return False
         got = engine.parse_json(raw, "[")
         if not isinstance(got, list):
+            log("[%s][summary] 返回不是列表:%s" % (self.sid, raw[:120])); return False
+        if not got:
+            # 内容还太少,模型给了空列表:这几句不算「已总结」,下一轮连同新句子一起再看;第一次给页面一句解释
+            if not getattr(self, "_sum_empty_told", False):
+                self._sum_empty_told = True
+                self.publish({"type": "status", "msg": "内容还太少,总结先不出;讲到有要点时会自动出现", "level": "info"})
             return False
         with self.lock:
             self.summary = got; self.upto = new[-1]["id"]

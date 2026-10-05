@@ -93,7 +93,8 @@ details.how ol{margin:6px 0 0;padding-left:18px} details.how li{margin:3px 0}
     <h1>英文课,手机也能听懂</h1>
     <p class="sub">手机录老师的声音,英文一句句出来、下面跟中文,AI 按主题整理要点,老师提问时给你一句能说出口的英文。下课自动存成笔记,同步到你的 Obsidian。iPhone、安卓、iPad 都行,不用装 App。</p>
     <button class="btn btn-sun" id="regBtn">开始使用(免费)</button>
-    <div class="hint">新账号可免费试用 10 分钟识别;之后填自己的 Groq 和 DeepSeek key(都是免费申请,一小时课约 3–5 毛)</div>
+    <div class="hint">新账号可免费试用 1 小时识别;之后填自己的 Groq 和 DeepSeek key(都是免费申请,一小时课约 3–5 毛)</div>
+    <div class="hint">请用 Safari 或 Chrome 打开;微信、QQ 里打开录不了音</div>
     <details class="prev"><summary>我已经有专属链接</summary>
       <label class="f">把链接或钥匙粘到这里</label>
       <div class="row"><input class="f" id="keyIn" placeholder="https://…/live/?k=… 或 钥匙本身" style="flex:1"><button class="btn btn-ghost sm" id="keyGo">进入</button></div>
@@ -212,7 +213,7 @@ if(K){ localStorage.setItem("k",K); if(u.searchParams.get("k")){ history.replace
 const api=(p)=>"/live/"+p+(p.includes("?")?"&":"?")+"k="+encodeURIComponent(K);
 const myLink=()=>location.origin+location.pathname+"?k="+encodeURIComponent(K);
 let ME=null, courses=[], chosen=null, sid=null, es=null, seq=0, recording=false, paused=false, tick=null, elapsedBase=0, startedAt=0;
-let stream=null, actx=null, analyser=null, rec=null, mime="", voiced=0, silence=0, cycleStart=0, levelTimer=null, wake=null, fromSettings=false;
+let stream=null, actx=null, analyser=null, rec=null, mime="", voiced=0, silence=0, cycleStart=0, levelTimer=null, wake=null, fromSettings=false, noSoundWarned=false, cycleCount=0;
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 function toast(msg,level="",link=null){const t=$("#toast");t.className=level;t.innerHTML=esc(msg)+(link?`<a href="${esc(link)}">打开</a>`:"");t.style.display="block";clearTimeout(t._h);if(level!=="error")t._h=setTimeout(()=>t.style.display="none",link?12000:5000);}
 async function post(p,body){const r=await fetch(api(p),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})});const j=await r.json().catch(()=>({}));if(!r.ok)toast(j.msg||("出错 "+r.status),"error");return j;}
@@ -273,16 +274,19 @@ async function loadRecords(){ const r=await fetch(api("records")); const j=await
 async function startMic(){
   stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:true,autoGainControl:true}});
   actx=new (window.AudioContext||window.webkitAudioContext)(); const src=actx.createMediaStreamSource(stream); analyser=actx.createAnalyser(); analyser.fftSize=1024; src.connect(analyser);
+  try{ await actx.resume(); }catch(e){}     // iPhone Safari 上 AudioContext 常是挂起状态,读到的音量永远是 0,必须主动唤醒
+  noSoundWarned=false; cycleCount=0;
   mime=["audio/webm;codecs=opus","audio/webm","audio/mp4","audio/ogg;codecs=opus"].find(m=>window.MediaRecorder&&MediaRecorder.isTypeSupported(m))||"";
   if(!mime) throw new Error("这个浏览器不支持录音,试试 Chrome 或 Safari 最新版");
   startCycle(); levelTimer=setInterval(levelLoop,100);
   try{ wake=await navigator.wakeLock?.request("screen"); }catch(e){}
 }
 function startCycle(){
-  rec=new MediaRecorder(stream,{mimeType:mime}); const parts=[]; const myT0=elapsedNow(); cycleStart=performance.now(); voiced=0; silence=0;
-  rec.ondataavailable=e=>{ if(e.data&&e.data.size) parts.push(e.data); };
-  rec.onstop=()=>{ const had=rec._voiced||0; if(had>=0.8 && parts.length){ upload(new Blob(parts,{type:mime}), myT0, (performance.now()-cycleStart)/1000); } if(recording&&!paused) startCycle(); };
-  rec.start();
+  const r=rec=new MediaRecorder(stream,{mimeType:mime}); const parts=[]; const myT0=elapsedNow(); const t0=performance.now(); cycleStart=t0; voiced=0; silence=0; r._max=0; cycleCount++;
+  r.ondataavailable=e=>{ if(e.data&&e.data.size) parts.push(e.data); };
+  // onstop 是异步到的,用闭包里的 r,别碰全局 rec(可能已经换成下一段或被 stopMic 清成 null)
+  r.onstop=()=>{ const had=r._voiced||0; if((had>=0.8||r._dead) && parts.length){ upload(new Blob(parts,{type:mime}), myT0, (performance.now()-t0)/1000); } if(recording&&!paused&&rec===r) startCycle(); };
+  r.start();
 }
 function levelLoop(){
   if(!analyser||!rec||rec.state!=="recording") return;
@@ -292,7 +296,12 @@ function levelLoop(){
   const thr=0.012;
   if(rms>=thr){ voiced+=0.1; silence=0; } else silence+=0.1;
   const len=(performance.now()-cycleStart)/1000;
-  rec._voiced=voiced;
+  rec._voiced=voiced; rec._max=Math.max(rec._max||0,rms);
+  // 分析器拿不到电平(AudioContext 没在跑,或整段读数都是 0):不靠它判断人声,改成每 12 秒切一段全部上传,免得整节课一个字没有
+  const dead=(actx&&actx.state!=="running")||(len>=6&&rec._max<1e-5);
+  rec._dead=dead;
+  if(dead){ if(len>=12) rec.stop(); return; }
+  if(!noSoundWarned&&cycleCount<=1&&len>=10&&rec._max<0.004){ noSoundWarned=true; toast("还没检测到声音:离老师近一点,或检查浏览器有没有给麦克风权限","error"); }
   // 2026-10-05:停顿 1.2 秒才切一段(原 0.7 秒切得太碎,出一堆半句),单段最长 20 秒
   if((voiced>=0.8&&silence>=1.2)||(len>=20&&voiced>=0.8)) rec.stop();
   else if(voiced<0.8&&len>=4) rec.stop();
