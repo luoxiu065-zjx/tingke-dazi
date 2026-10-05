@@ -65,21 +65,40 @@ details.how ol{margin:6px 0 0;padding-left:18px} details.how li{margin:3px 0}
 .tab{flex:1;border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px;font:inherit;color:var(--ink2)} .tab.on{background:var(--ink);color:#fff;border-color:var(--ink)}
 .tab small{opacity:.7;margin-left:4px}
 .pane{display:none} .pane.on{display:block}
-/* 宽屏(Mac / iPad 横屏 / 笔记本浏览器):三块并排,像电脑版;窄屏还是一个个切 */
-body.wide main{max-width:1500px}
-body.wide #live .card{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);grid-template-areas:"bar bar" "trans sum" "trans qa";gap:14px;align-items:start}
-body.wide #live .card>.bar{grid-area:bar;margin-bottom:0}
+/* 宽屏(Mac / iPad 横屏 / 笔记本浏览器):照搬电脑版的壳 —— 左侧栏 + 课程标题 + 2×2 模块卡;窄屏还是一个个切 */
+.shell{display:block}
+.lside,.lcrumb,.lhead,.mod-h{display:none}
+#gridwrap{display:block}
+.mod{display:contents}
+body.wide{background:var(--sky)}
+body.wide main{max-width:none;padding:0}
+body.wide header{display:none}
+body.wide .shell{display:flex;gap:0;height:100vh;align-items:stretch}
+body.wide .lside{display:flex;flex-direction:column;width:216px;flex:none;padding:18px 16px;background:var(--paper);border-right:1px solid var(--line)}
+body.wide .lbrand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;margin:0 2px 20px}
+body.wide .lside-t{font-size:12px;letter-spacing:.08em;color:var(--ink3);margin-bottom:6px}
+body.wide .lside-c{font-size:15px;font-weight:600;line-height:1.4}
+body.wide .lside-s{font-size:12.5px;color:var(--ink3);line-height:1.5}
+body.wide .lside-foot{margin-top:auto}
+body.wide .lmain{flex:1;min-width:0;display:flex;flex-direction:column;padding:16px 22px 14px;gap:0}
+body.wide .lcrumb{display:block;font-size:13px;color:var(--ink3);margin-bottom:2px}
+body.wide .lcrumb span{color:var(--ink3);opacity:.7}
+body.wide .lhead{display:block;margin:0 0 12px}
+body.wide .lhead h1{font-size:26px;margin:0}
+body.wide #live .card{flex:1;min-height:0;display:flex;flex-direction:column;margin-bottom:10px}
 body.wide .tabs{display:none}
-body.wide .pane{display:block;border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:#fff;overflow:auto}
-body.wide #trans{grid-area:trans;max-height:calc(100vh - 290px)}
-body.wide #sum{grid-area:sum;max-height:calc(50vh - 150px)}
-body.wide #qa{grid-area:qa;max-height:calc(50vh - 150px)}
-body.wide .pane::before{display:block;font-weight:700;font-size:13.5px;color:var(--ink2);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--line)}
-body.wide #trans::before{content:"转写 · 英文原文 + 中文"}
-body.wide #sum::before{content:"AI 总结 · 约每 40 秒更新"}
-body.wide #qa::before{content:"老师提问 · 自动弹卡"}
-body.wide .foot{position:static;background:none;padding:0 0 10px}
-body.wide .foot .row{max-width:520px;margin-left:auto}
+body.wide #gridwrap{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);grid-template-rows:1fr 1fr;gap:14px;margin-top:12px}
+body.wide .mod{display:flex;flex-direction:column;min-height:0;border:1px solid var(--line);border-radius:14px;padding:12px 14px 8px;background:#fff}
+body.wide #modTrans{grid-row:1 / span 2}
+body.wide .mod-h{display:flex;align-items:center;gap:8px;font-size:15.5px;font-weight:700;margin-bottom:8px}
+body.wide .mod-h .ic{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;font-size:13px;background:var(--sun-soft);color:#9A6700;flex:none}
+body.wide .mod-h small{font-weight:400;color:var(--ink3);font-size:12px;margin-left:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+body.wide .pane{display:block;flex:1;min-height:0;overflow:auto;padding-right:4px}
+body.wide #live .card{position:relative}
+body.wide .foot{position:absolute;top:12px;right:16px;width:auto;background:none;padding:0;z-index:3}
+body.wide .foot .row{gap:8px}
+body.wide .foot .btn{width:auto;padding:9px 16px;font-size:14px;border-radius:10px}
+body.wide .bar{padding-right:300px}
 .viewbtn{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 12px;font:inherit;font-size:13px;color:var(--ink2);margin-left:8px;display:none}
 .seg{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
 .seg .ts{font-family:var(--mono);font-size:11px;color:var(--ink3);min-width:52px;padding-top:3px}
@@ -195,21 +214,40 @@ body.wide .foot .row{max-width:520px;margin-left:auto}
 
 <!-- 3 录制 -->
 <section id="live">
-  <div class="card">
-    <div class="bar" id="bar"><span class="dot"></span><span class="timer" id="timer">00:00:00</span><div class="level"><i id="lv"></i></div></div>
-    <div class="tabs">
-      <button class="tab on" data-p="trans">转写<small id="nTrans"></small></button>
-      <button class="tab" data-p="sum">总结</button>
-      <button class="tab" data-p="qa">提问<small id="nQa"></small></button>
+  <div class="shell">
+    <aside class="lside">
+      <div class="lbrand"><div class="logo">搭</div>听课搭子</div>
+      <div class="lside-t">本节课</div>
+      <div class="lside-c" id="sideCourse">—</div>
+      <div class="lside-t" style="margin-top:18px">记录去哪</div>
+      <div class="lside-s" id="sideWhere">下课自动存成笔记</div>
+      <div class="lside-foot"><button class="viewbtn" id="viewBtn2">▤ 手机视图</button></div>
+    </aside>
+    <div class="lmain">
+      <div class="lcrumb">实时记录 <span id="lcrumbSub">· 录制中</span></div>
+      <div class="lhead"><h1 id="liveTitle">正在上课</h1></div>
+      <div class="card">
+        <div class="bar" id="bar"><span class="dot"></span><span class="timer" id="timer">00:00:00</span><div class="level"><i id="lv"></i></div></div>
+        <div class="tabs">
+          <button class="tab on" data-p="trans">转写<small id="nTrans"></small></button>
+          <button class="tab" data-p="sum">总结</button>
+          <button class="tab" data-p="qa">提问<small id="nQa"></small></button>
+        </div>
+        <div id="gridwrap">
+          <div class="mod" id="modTrans"><div class="mod-h"><span class="ic">✎</span>转写<small>英文原文 · 灰字为中文</small></div>
+            <div class="pane on" id="trans"><div class="empty" id="transEmpty">等老师开口…</div></div></div>
+          <div class="mod" id="modSum"><div class="mod-h"><span class="ic">✦</span>AI 总结<small>整节课 · 约每 40 秒更新</small></div>
+            <div class="pane" id="sum"><div class="empty">讲过一段内容后,这里会按主题出现笔记。</div></div></div>
+          <div class="mod" id="modQa"><div class="mod-h"><span class="ic">🎯</span>老师提问<small>老师一提问,自动给中英文参考回答</small></div>
+            <div class="pane" id="qa"><div class="empty" id="qaEmpty">还没有人提问。</div></div></div>
+        </div>
+      </div>
+      <div class="foot"><div class="row">
+        <button class="btn btn-ghost" id="pauseBtn">❚❚ 暂停</button>
+        <button class="btn btn-red" id="stopBtn">⏺ 结束并保存</button>
+      </div></div>
     </div>
-    <div class="pane on" id="trans"><div class="empty" id="transEmpty">等老师开口…</div></div>
-    <div class="pane" id="sum"><div class="empty">讲过一段内容后,这里会按主题出现笔记。</div></div>
-    <div class="pane" id="qa"><div class="empty" id="qaEmpty">还没有人提问。</div></div>
   </div>
-  <div class="foot"><div class="row">
-    <button class="btn btn-ghost" id="pauseBtn">❚❚ 暂停</button>
-    <button class="btn btn-red" id="stopBtn">⏺ 结束并保存</button>
-  </div></div>
 </section>
 
 <!-- 4 保存完成 -->
@@ -229,7 +267,7 @@ if(K){ localStorage.setItem("k",K); if(u.searchParams.get("k")){ history.replace
 const api=(p)=>"/live/"+p+(p.includes("?")?"&":"?")+"k="+encodeURIComponent(K);
 const myLink=()=>location.origin+location.pathname+"?k="+encodeURIComponent(K);
 let ME=null, courses=[], chosen=null, sid=null, es=null, seq=0, recording=false, paused=false, tick=null, elapsedBase=0, startedAt=0;
-let stream=null, actx=null, analyser=null, rec=null, mime="", voiced=0, silence=0, cycleStart=0, levelTimer=null, wake=null, fromSettings=false, noSoundWarned=false, cycleCount=0;
+let stream=null, actx=null, analyser=null, rec=null, mime="", voiced=0, silence=0, cycleStart=0, levelTimer=null, wake=null, fromSettings=false, noSoundWarned=false, cycleCount=0, floorR=0.02, peak=0;
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 function toast(msg,level="",link=null){const t=$("#toast");t.className=level;t.innerHTML=esc(msg)+(link?`<a href="${esc(link)}">打开</a>`:"");t.style.display="block";clearTimeout(t._h);if(level!=="error")t._h=setTimeout(()=>t.style.display="none",link?12000:5000);}
 async function post(p,body){const r=await fetch(api(p),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})});const j=await r.json().catch(()=>({}));if(!r.ok)toast(j.msg||("出错 "+r.status),"error");return j;}
@@ -239,7 +277,8 @@ function applyView(){
   const forced=localStorage.getItem("view");
   const wide = forced ? forced==="wide" : (innerWidth>=1000 && innerWidth>innerHeight*0.9);
   document.body.classList.toggle("wide", wide);
-  const b=$("#viewBtn"); if(b){ b.textContent = wide ? "▤ 手机视图" : "⊞ 宽屏视图"; b.style.display = (innerWidth>=820 && $("#live").style.display==="block") ? "inline-block" : "none"; }
+  const b=$("#viewBtn"); if(b){ b.textContent = "⊞ 宽屏视图"; b.style.display = (!wide && innerWidth>=820 && $("#live").style.display==="block") ? "inline-block" : "none"; }
+  const b2=$("#viewBtn2"); if(b2) b2.style.display = wide ? "inline-block" : "none";
   if(wide) document.querySelectorAll(".pane").forEach(p=>p.classList.add("on"));
 }
 addEventListener("resize", applyView);
@@ -293,7 +332,8 @@ $("#w3Back").onclick=()=>gotoStep(2);
 $("#testNote").onclick=async()=>{ $("#testMsg").textContent="发送中…"; const j=await post("sync/testnote",{}); $("#testMsg").innerHTML=`<span class="${j.ok?"ok":"bad"}">${esc(j.msg)}</span>`; };
 $("#w3Done").onclick=async()=>{ const cs=$("#coursesIn").value.split("\n").map(x=>x.trim()).filter(Boolean); await post("settings",{courses:cs.length?cs:["其他"]}); localStorage.setItem("wizard_done","1"); $("#linkbar").style.display="none"; await loadConfig(); show("setup"); };
 $("#gearBtn").onclick=()=>{ fillWizard(); gotoStep(1); show("wizard"); };
-$("#viewBtn").onclick=()=>{ localStorage.setItem("view", document.body.classList.contains("wide")?"tab":"wide"); applyView(); };
+const toggleView=()=>{ localStorage.setItem("view", document.body.classList.contains("wide")?"tab":"wide"); applyView(); };
+$("#viewBtn").onclick=toggleView; $("#viewBtn2").onclick=toggleView;
 async function loadRecords(){ const r=await fetch(api("records")); const j=await r.json().catch(()=>({items:[]})); $("#recList").innerHTML=(j.items||[]).length?j.items.map(it=>`<div class="rec-item"><span>${esc(it.name)}</span><a href="${api("record?f="+encodeURIComponent(it.rel))}">下载</a></div>`).join(""):`<div class="mut">还没有记录</div>`; }
 
 /* ---------- 录音:按停顿切段,每段单独一个文件传给服务器 ---------- */
@@ -301,7 +341,7 @@ async function startMic(){
   stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:true,autoGainControl:true}});
   actx=new (window.AudioContext||window.webkitAudioContext)(); const src=actx.createMediaStreamSource(stream); analyser=actx.createAnalyser(); analyser.fftSize=1024; src.connect(analyser);
   try{ await actx.resume(); }catch(e){}     // iPhone Safari 上 AudioContext 常是挂起状态,读到的音量永远是 0,必须主动唤醒
-  noSoundWarned=false; cycleCount=0;
+  noSoundWarned=false; cycleCount=0; floorR=0.02; peak=0;
   mime=["audio/webm;codecs=opus","audio/webm","audio/mp4","audio/ogg;codecs=opus"].find(m=>window.MediaRecorder&&MediaRecorder.isTypeSupported(m))||"";
   if(!mime) throw new Error("这个浏览器不支持录音,试试 Chrome 或 Safari 最新版");
   startCycle(); levelTimer=setInterval(levelLoop,100);
@@ -318,19 +358,21 @@ function levelLoop(){
   if(!analyser||!rec||rec.state!=="recording") return;
   const buf=new Float32Array(analyser.fftSize); analyser.getFloatTimeDomainData(buf);
   let s=0; for(const v of buf) s+=v*v; const rms=Math.sqrt(s/buf.length);
-  $("#lv").style.width=Math.min(100,rms*600)+"%";
-  const thr=0.012;
+  peak=Math.max(peak*0.995, rms);
+  $("#lv").style.width=Math.min(100,Math.sqrt(rms)*320)+"%";
+  // 本底噪声:慢慢向下贴,安静时降,说话时几乎不动。阈值 = 本底的 2.5 倍,最低 0.0025
+  floorR = rms < floorR ? (floorR*0.9 + rms*0.1) : (floorR*0.999 + rms*0.001);
+  const thr=Math.max(0.0025, floorR*2.5);
   if(rms>=thr){ voiced+=0.1; silence=0; } else silence+=0.1;
   const len=(performance.now()-cycleStart)/1000;
   rec._voiced=voiced; rec._max=Math.max(rec._max||0,rms);
-  // 分析器拿不到电平(AudioContext 没在跑,或整段读数都是 0):不靠它判断人声,改成每 12 秒切一段全部上传,免得整节课一个字没有
-  const dead=(actx&&actx.state!=="running")||(len>=6&&rec._max<1e-5);
-  rec._dead=dead;
-  if(dead){ if(len>=12) rec.stop(); return; }
-  if(!noSoundWarned&&cycleCount<=1&&len>=10&&rec._max<0.004){ noSoundWarned=true; toast("还没检测到声音:离老师近一点,或检查浏览器有没有给麦克风权限","error"); }
-  // 2026-10-05:停顿 1.2 秒才切一段(原 0.7 秒切得太碎,出一堆半句),单段最长 20 秒
+  // 分析器完全读不到(AudioContext 没在跑/读数恒为 0),或者录了 25 秒还一段没传上去:不再靠人声判断,按时间切,全部上传让服务器去听
+  const blind=(actx&&actx.state!=="running")||(len>=6&&rec._max<1e-6)||(seq===0&&elapsedNow()>25);
+  rec._dead=blind;
+  if(blind){ if(len>=10) rec.stop(); return; }
+  if(!noSoundWarned&&elapsedNow()>14&&peak<0.002){ noSoundWarned=true; toast("几乎没听到声音:确认浏览器允许了麦克风,手机别用微信/QQ 内置浏览器,离声源近一点","error"); }
   if((voiced>=0.8&&silence>=1.2)||(len>=20&&voiced>=0.8)) rec.stop();
-  else if(voiced<0.8&&len>=4) rec.stop();
+  else if(voiced<0.8&&len>=6) rec.stop();
 }
 function elapsedNow(){ return elapsedBase+(startedAt?(performance.now()-startedAt)/1000:0); }
 async function upload(blob,t0,dur){
@@ -343,6 +385,7 @@ function stopMic(){ clearInterval(levelTimer); try{rec&&rec.state!=="inactive"&&
 /* ---------- 录制界面 ---------- */
 function enterLive(){
   show("live"); $("#chip").style.display="inline"; $("#chip").textContent=chosen.split(" ")[0];
+  $("#liveTitle").textContent=chosen; $("#sideCourse").textContent=chosen; $("#sideWhere").textContent=(ME&&ME.sync&&ME.sync.mode==="none")?"结束后在这页下载":"下课自动存成笔记,同步到 Obsidian";
   applyView();
   connect(); startedAt=performance.now(); recording=true; clearInterval(tick); tick=setInterval(()=>$("#timer").textContent=fmt(elapsedNow()),500);
 }
