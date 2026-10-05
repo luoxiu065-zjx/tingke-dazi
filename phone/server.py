@@ -53,7 +53,39 @@ PUB_GROQ = groq_client(GROQ_KEY) if GROQ_KEY else None     # 公共 key:owner �
 PUB_DS = ds_client(DS_KEY)
 app = Flask(__name__, static_folder=None)
 # users 模块在 load_dotenv 之前就 import 了,试用额度两个值要在这里按 .env 再设一次
-usersmod.TRIAL_SECONDS = int(os.getenv("TRIAL_SECONDS", "600")); usersmod.TRIAL_DAILY_CAP = int(os.getenv("TRIAL_DAILY_CAP", "3600"))
+usersmod.TRIAL_SECONDS = int(os.getenv("TRIAL_SECONDS", "1800")); usersmod.TRIAL_DAILY_CAP = int(os.getenv("TRIAL_DAILY_CAP", "18000"))
+TRIAL_CONCURRENT = int(os.getenv("TRIAL_CONCURRENT", "3"))      # 同时在录的试用课上限:Groq 免费档每个模型每分钟 20 次请求,一个人约 6–7 次/分钟
+ALT_MODEL = {"whisper-large-v3": "whisper-large-v3-turbo", "whisper-large-v3-turbo": "whisper-large-v3"}
+
+
+def groq_transcribe(client, data, ext, prompt):
+    """先用默认模型;被限流(429)就换另一个模型(额度分开算),都限流就等几秒再试一次。其他错误照常抛出。"""
+    models = [GROQ_MODEL, ALT_MODEL.get(GROQ_MODEL, GROQ_MODEL)]
+    last = None
+    for attempt in range(3):
+        m = models[min(attempt, 1)]
+        try:
+            return client.audio.transcriptions.create(file=("chunk." + ext, data), model=m, language="en",
+                                                      prompt=prompt, response_format="verbose_json", temperature=0)
+        except Exception as e:
+            last = e
+            if "429" not in str(e) and "rate" not in str(e).lower():
+                raise
+            if attempt == 1:
+                time.sleep(6)
+    raise last
+
+
+def trial_busy(u):
+    """新开一节试用课前:已经有 TRIAL_CONCURRENT 节试用课在录,就请他填自己的 key。"""
+    if u.get("owner") or u.get("groq_key"):
+        return False
+    with S_LOCK:
+        n = sum(1 for x in SESSIONS.values() if x.trial and x.state in ("recording", "paused"))
+    return n >= TRIAL_CONCURRENT
+
+
+BUSY_MSG = "试用通道现在人满(同时最多 %d 人在录)。花 1 分钟申请一个免费的 Groq key 填进设置,就不用排队了"
 USERS = usersmod.Users(os.path.join(BASE, "data"), DAV_ROOT, DAV_AUTH_DIR, PUBLIC_BASE)
 
 
@@ -295,8 +327,7 @@ class Session:
                 return
             USERS.trial_add(self.user, dur)
         try:
-            r = self.groq.audio.transcriptions.create(file=("chunk." + ext, data), model=GROQ_MODEL, language="en",
-                                                 prompt=prompt.strip(), response_format="verbose_json", temperature=0)
+            r = groq_transcribe(self.groq, data, ext, prompt.strip())
             segs = getattr(r, "segments", None) or []
             if segs:
                 text = " ".join(s.get("text", "").strip() if isinstance(s, dict) else (s.text or "").strip() for s in segs
@@ -778,6 +809,8 @@ def start():
         return jsonify({"ok": False, "msg": "试用额度用完了,到设置里填自己的 Groq 和 DeepSeek key 再开始"}), 402
     if not PUB_GROQ and not g.user.get("groq_key"):
         return jsonify({"ok": False, "msg": "还没填 Groq key"}), 400
+    if trial_busy(g.user):
+        return jsonify({"ok": False, "msg": BUSY_MSG % TRIAL_CONCURRENT}), 429
     s = Session(g.user, course)
     with S_LOCK:
         SESSIONS[s.sid] = s
@@ -987,6 +1020,8 @@ def d_start():
         return jsonify({"ok": False, "msg": "试用额度用完了:点左下角「设置」填自己的 Groq key 和 DeepSeek key(都免费申请)再开始"}), 402
     if not PUB_GROQ and not u.get("groq_key"):
         return jsonify({"ok": False, "msg": "还没填 Groq key:点左下角「设置」填一下"}), 400
+    if trial_busy(u):
+        return jsonify({"ok": False, "msg": BUSY_MSG % TRIAL_CONCURRENT}), 429
     s = Session(u, course)
     with S_LOCK:
         SESSIONS[s.sid] = s

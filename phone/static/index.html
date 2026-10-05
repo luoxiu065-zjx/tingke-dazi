@@ -128,7 +128,7 @@ body.wide .bar{padding-right:300px}
     <h1>英文课,打开网页就能听懂</h1>
     <p class="sub">手机录老师的声音,英文一句句出来、下面跟中文,AI 按主题整理要点,老师提问时给你一句能说出口的英文。下课自动存成笔记,同步到你的 Obsidian。手机、平板、Mac、电脑浏览器都行,不用装任何东西。</p>
     <button class="btn btn-sun" id="regBtn">开始使用(免费)</button>
-    <div class="hint">新账号可免费试用 1 小时识别;之后填自己的 Groq 和 DeepSeek key(都是免费申请,一小时课约 3–5 毛)</div>
+    <div class="hint">新账号可免费试用 30 分钟识别;之后填自己的 Groq 和 DeepSeek key(都是免费申请,一小时课约 3–5 毛)</div>
     <div class="hint">请用 Safari 或 Chrome 打开(手机上微信、QQ 里打开录不了音)</div>
     <details class="prev"><summary>我已经有专属链接</summary>
       <label class="f">把链接或钥匙粘到这里</label>
@@ -412,7 +412,11 @@ function elapsedNow(){ return elapsedBase+(startedAt?(performance.now()-startedA
 async function upload(blob,t0,dur){
   const fd=new FormData(); fd.append("sid",sid); fd.append("seq",String(seq++)); fd.append("t0",String(t0.toFixed(1))); fd.append("dur",String(dur.toFixed(1))); fd.append("mime","audio/wav");
   fd.append("file",blob,"chunk.wav");
-  try{ const r=await fetch(api("chunk"),{method:"POST",body:fd}); if(!r.ok) toast("上传失败 "+r.status,"error"); }catch(e){ toast("网络断了,这一段没传上去","error"); }
+  for(let i=0;i<3;i++){            // 网络抖一下就重试,别丢这一句
+    try{ const r=await fetch(api("chunk"),{method:"POST",body:fd}); if(r.ok||r.status===410) return; }catch(e){}
+    await new Promise(ok=>setTimeout(ok,1500*(i+1)));
+  }
+  toast("网络不好,有一段没传上去","error");
 }
 function stopMic(){
   try{ if(pcmLen) flushSeg(); }catch(e){}                    // 最后一句别丢
