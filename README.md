@@ -72,6 +72,14 @@ venv\Scripts\python tests\test_session.py     # 其余 tests\test_*.py 同理,�
 
 `启动.bat` 会优先用 `python\`（安装包），其次用 `venv\`。`app.py --no-audio` 只起网页、不加载模型；网址加 `?preview=1` 是假数据预览，用于改界面。
 
+## 课后答疑：一键配好 Obsidian
+
+双击 **`配置Obsidian.bat`**，按提示粘一次 DeepSeek key，它会：建好笔记库 → 装好 Obsidian / Node / Git / Claude Code（缺什么装什么）→ 把 Claudian 插件装进库并指向 DeepSeek、模型也选好 → 把听课搭子的记录目录指到这个库 → 打开 Obsidian。
+
+打开后 Obsidian 会问一次「是否信任这个库的插件」，点**信任仓库作者并启用插件**，就能在右侧栏直接问问题了，不用登录、不用选模型。
+
+已经在用 Obsidian？把你的库路径作为参数传给它：`配置Obsidian.bat D:\我的库`。如果那个库的 Claudian 已经配过别的（比如 Claude 订阅），脚本会原样保留、不覆盖。
+
 ## 手机 / 平板网页版（测试中）
 
 没带电脑、只有手机或平板时用的版本,在 [`phone/`](phone/README.md):手机浏览器打开网页、录老师的声音,识别(Groq)和翻译总结(DeepSeek)在**你自己的服务器**上做,下课存成同样格式的笔记。设计为一个人用,想用请自己部署一份(约 15 分钟,README 里有步骤)。作者托管的公开版还在小范围测试,想试的在 issue 里留言。
