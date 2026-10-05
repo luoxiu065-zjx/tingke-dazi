@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#FFFDF8">
-<title>听课搭子 · 手机版</title>
+<title>听课搭子 · 网页版</title>
 <style>
 :root{--paper:#FFFDF8;--sky:#EEF6FF;--card:#fff;--ink:#15233B;--ink2:#3F4D63;--ink3:#66738A;--line:#E7E2D6;--sun:#FFC83D;--sun-soft:#FFF1C7;--blue:#2F7BEA;--blue-soft:#E4EFFE;--red:#D93B3B;--ok:#16945C;--ok-soft:#E3F5EC;
   --sans:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;--mono:ui-monospace,Menlo,Consolas,monospace}
@@ -65,6 +65,22 @@ details.how ol{margin:6px 0 0;padding-left:18px} details.how li{margin:3px 0}
 .tab{flex:1;border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px;font:inherit;color:var(--ink2)} .tab.on{background:var(--ink);color:#fff;border-color:var(--ink)}
 .tab small{opacity:.7;margin-left:4px}
 .pane{display:none} .pane.on{display:block}
+/* 宽屏(Mac / iPad 横屏 / 笔记本浏览器):三块并排,像电脑版;窄屏还是一个个切 */
+body.wide main{max-width:1500px}
+body.wide #live .card{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);grid-template-areas:"bar bar" "trans sum" "trans qa";gap:14px;align-items:start}
+body.wide #live .card>.bar{grid-area:bar;margin-bottom:0}
+body.wide .tabs{display:none}
+body.wide .pane{display:block;border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:#fff;overflow:auto}
+body.wide #trans{grid-area:trans;max-height:calc(100vh - 290px)}
+body.wide #sum{grid-area:sum;max-height:calc(50vh - 150px)}
+body.wide #qa{grid-area:qa;max-height:calc(50vh - 150px)}
+body.wide .pane::before{display:block;font-weight:700;font-size:13.5px;color:var(--ink2);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+body.wide #trans::before{content:"转写 · 英文原文 + 中文"}
+body.wide #sum::before{content:"AI 总结 · 约每 40 秒更新"}
+body.wide #qa::before{content:"老师提问 · 自动弹卡"}
+body.wide .foot{position:static;background:none;padding:0 0 10px}
+body.wide .foot .row{max-width:520px;margin-left:auto}
+.viewbtn{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 12px;font:inherit;font-size:13px;color:var(--ink2);margin-left:8px;display:none}
 .seg{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
 .seg .ts{font-family:var(--mono);font-size:11px;color:var(--ink3);min-width:52px;padding-top:3px}
 .seg .en{color:var(--ink)} .seg .zh{color:var(--ink2);font-size:14px;margin-top:3px}
@@ -84,17 +100,17 @@ details.how ol{margin:6px 0 0;padding-left:18px} details.how li{margin:3px 0}
 </style>
 </head>
 <body>
-<header><div class="logo">搭</div><b>听课搭子</b><span style="color:var(--ink3);font-size:13px">手机版</span><span class="chip" id="chip"></span><button class="gear" id="gearBtn">⚙ 设置</button></header>
+<header><div class="logo">搭</div><b>听课搭子</b><span style="color:var(--ink3);font-size:13px">网页版</span><span class="chip" id="chip"></span><button class="viewbtn" id="viewBtn">⊞ 宽屏</button><button class="gear" id="gearBtn">⚙ 设置</button></header>
 <main>
 
 <!-- 0 欢迎(没有钥匙) -->
 <section class="scr" id="welcome">
   <div class="card">
-    <h1>英文课,手机也能听懂</h1>
-    <p class="sub">手机录老师的声音,英文一句句出来、下面跟中文,AI 按主题整理要点,老师提问时给你一句能说出口的英文。下课自动存成笔记,同步到你的 Obsidian。iPhone、安卓、iPad 都行,不用装 App。</p>
+    <h1>英文课,打开网页就能听懂</h1>
+    <p class="sub">手机录老师的声音,英文一句句出来、下面跟中文,AI 按主题整理要点,老师提问时给你一句能说出口的英文。下课自动存成笔记,同步到你的 Obsidian。手机、平板、Mac、电脑浏览器都行,不用装任何东西。</p>
     <button class="btn btn-sun" id="regBtn">开始使用(免费)</button>
     <div class="hint">新账号可免费试用 1 小时识别;之后填自己的 Groq 和 DeepSeek key(都是免费申请,一小时课约 3–5 毛)</div>
-    <div class="hint">请用 Safari 或 Chrome 打开;微信、QQ 里打开录不了音</div>
+    <div class="hint">请用 Safari 或 Chrome 打开(手机上微信、QQ 里打开录不了音)</div>
     <details class="prev"><summary>我已经有专属链接</summary>
       <label class="f">把链接或钥匙粘到这里</label>
       <div class="row"><input class="f" id="keyIn" placeholder="https://…/live/?k=… 或 钥匙本身" style="flex:1"><button class="btn btn-ghost sm" id="keyGo">进入</button></div>
@@ -170,7 +186,7 @@ details.how ol{margin:6px 0 0;padding-left:18px} details.how li{margin:3px 0}
 <!-- 2 选课 -->
 <section class="scr card" id="setup">
   <h1>这是哪门课?</h1>
-  <p class="sub">手机录老师的声音,转写和翻译在服务器上做,下课自动存成笔记。录音时别锁屏。</p>
+  <p class="sub">录老师的声音,转写和翻译在服务器上做,下课自动存成笔记。手机录音时别锁屏。</p>
   <div class="courses" id="courses"></div>
   <button class="btn btn-sun" id="startBtn" disabled>🎙 开始录制</button>
   <div class="hint" id="hint">先选课程</div>
@@ -218,7 +234,16 @@ const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&g
 function toast(msg,level="",link=null){const t=$("#toast");t.className=level;t.innerHTML=esc(msg)+(link?`<a href="${esc(link)}">打开</a>`:"");t.style.display="block";clearTimeout(t._h);if(level!=="error")t._h=setTimeout(()=>t.style.display="none",link?12000:5000);}
 async function post(p,body){const r=await fetch(api(p),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})});const j=await r.json().catch(()=>({}));if(!r.ok)toast(j.msg||("出错 "+r.status),"error");return j;}
 function fmt(s){s=Math.max(0,Math.floor(s));const p=n=>String(n).padStart(2,"0");return p(s/3600|0)+":"+p(s%3600/60|0)+":"+p(s%60);}
-function show(id){document.querySelectorAll(".scr").forEach(x=>x.classList.toggle("on",x.id===id)); $("#live").style.display=id==="live"?"block":"none"; $("#gearBtn").style.display=(id==="setup")?"inline-block":"none"; window.scrollTo(0,0);}
+/* 视图:宽屏三块并排 / 窄屏一个个切。默认按屏幕宽度,点按钮可手动切,记住选择 */
+function applyView(){
+  const forced=localStorage.getItem("view");
+  const wide = forced ? forced==="wide" : (innerWidth>=1000 && innerWidth>innerHeight*0.9);
+  document.body.classList.toggle("wide", wide);
+  const b=$("#viewBtn"); if(b){ b.textContent = wide ? "▤ 手机视图" : "⊞ 宽屏视图"; b.style.display = (innerWidth>=820 && $("#live").style.display==="block") ? "inline-block" : "none"; }
+  if(wide) document.querySelectorAll(".pane").forEach(p=>p.classList.add("on"));
+}
+addEventListener("resize", applyView);
+function show(id){document.querySelectorAll(".scr").forEach(x=>x.classList.toggle("on",x.id===id)); $("#live").style.display=id==="live"?"block":"none"; $("#gearBtn").style.display=(id==="setup")?"inline-block":"none"; window.scrollTo(0,0); applyView();}
 async function copy(t,btn){try{await navigator.clipboard.writeText(t);if(btn){const o=btn.textContent;btn.textContent="已复制";setTimeout(()=>btn.textContent=o,1500);}}catch(e){prompt("长按复制",t);}}
 
 /* ---------- 欢迎 / 注册 ---------- */
@@ -268,6 +293,7 @@ $("#w3Back").onclick=()=>gotoStep(2);
 $("#testNote").onclick=async()=>{ $("#testMsg").textContent="发送中…"; const j=await post("sync/testnote",{}); $("#testMsg").innerHTML=`<span class="${j.ok?"ok":"bad"}">${esc(j.msg)}</span>`; };
 $("#w3Done").onclick=async()=>{ const cs=$("#coursesIn").value.split("\n").map(x=>x.trim()).filter(Boolean); await post("settings",{courses:cs.length?cs:["其他"]}); localStorage.setItem("wizard_done","1"); $("#linkbar").style.display="none"; await loadConfig(); show("setup"); };
 $("#gearBtn").onclick=()=>{ fillWizard(); gotoStep(1); show("wizard"); };
+$("#viewBtn").onclick=()=>{ localStorage.setItem("view", document.body.classList.contains("wide")?"tab":"wide"); applyView(); };
 async function loadRecords(){ const r=await fetch(api("records")); const j=await r.json().catch(()=>({items:[]})); $("#recList").innerHTML=(j.items||[]).length?j.items.map(it=>`<div class="rec-item"><span>${esc(it.name)}</span><a href="${api("record?f="+encodeURIComponent(it.rel))}">下载</a></div>`).join(""):`<div class="mut">还没有记录</div>`; }
 
 /* ---------- 录音:按停顿切段,每段单独一个文件传给服务器 ---------- */
@@ -317,6 +343,7 @@ function stopMic(){ clearInterval(levelTimer); try{rec&&rec.state!=="inactive"&&
 /* ---------- 录制界面 ---------- */
 function enterLive(){
   show("live"); $("#chip").style.display="inline"; $("#chip").textContent=chosen.split(" ")[0];
+  applyView();
   connect(); startedAt=performance.now(); recording=true; clearInterval(tick); tick=setInterval(()=>$("#timer").textContent=fmt(elapsedNow()),500);
 }
 function setPaused(p, withMic=true){

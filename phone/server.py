@@ -50,6 +50,8 @@ def ds_client(key, base=None):
 PUB_GROQ = groq_client(GROQ_KEY) if GROQ_KEY else None     # 公共 key:owner 账号用 + 新用户试用
 PUB_DS = ds_client(DS_KEY)
 app = Flask(__name__, static_folder=None)
+# users 模块在 load_dotenv 之前就 import 了,试用额度两个值要在这里按 .env 再设一次
+usersmod.TRIAL_SECONDS = int(os.getenv("TRIAL_SECONDS", "600")); usersmod.TRIAL_DAILY_CAP = int(os.getenv("TRIAL_DAILY_CAP", "3600"))
 USERS = usersmod.Users(os.path.join(BASE, "data"), DAV_ROOT, DAV_AUTH_DIR, PUBLIC_BASE)
 
 
@@ -555,8 +557,9 @@ def keys_test():
             out["ds"] = [False, "没填"]
         else:
             try:
+                # max_tokens 别太小:推理模型先想再答,太小正文为空;这里只看有没有报错
                 llm_with(ds_client(dk, j.get("ds_base") or g.user.get("ds_base")), j.get("ds_model") or g.user.get("ds_model") or DS_MODEL,
-                         [{"role": "user", "content": "回复一个字:好"}], max_tokens=5); out["ds"] = [True, "能用"]
+                         [{"role": "user", "content": "回复一个字:好"}], max_tokens=64); out["ds"] = [True, "能用"]
             except Exception as e:
                 msg = str(e)
                 out["ds"] = [False, "余额不足,去充几块钱" if "402" in msg or "Insufficient" in msg else "不对:%s" % msg[:100]]
