@@ -1131,8 +1131,11 @@ def settings_test():
         from openai import OpenAI
         c = OpenAI(api_key=key or "ollama", base_url=base_url)
         t = time.time()
-        r = c.chat.completions.create(model=model, messages=[{"role": "user", "content": "只回复两个字:可以"}], max_tokens=8, temperature=0)
-        return jsonify({"ok": True, "ms": int((time.time() - t) * 1000), "reply": (r.choices[0].message.content or "").strip()[:40]})
+        # max_tokens 别给太小:推理模型(deepseek-reasoner 之类)先想再答,8 个 token 会让正文为空,看起来像「不能用」
+        r = c.chat.completions.create(model=model, messages=[{"role": "user", "content": "只回复两个字:可以"}], max_tokens=64, temperature=0)
+        m = r.choices[0].message
+        reply = (m.content or "").strip()[:40] or ("(推理模型,连接正常)" if getattr(m, "reasoning_content", None) else "(空回复)")
+        return jsonify({"ok": True, "ms": int((time.time() - t) * 1000), "reply": reply})
     except Exception as e:
         return jsonify({"ok": False, "msg": "连不上:%s" % str(e)[:200]}), 400
 
