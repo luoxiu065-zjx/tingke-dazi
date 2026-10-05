@@ -238,7 +238,7 @@
     <div class="frow"><label>提供商</label><select id="stProv"></select><div class="note" id="stKeyUrl"></div></div>
     <div class="frow"><label>接口地址</label><input id="stBase" placeholder="https://…"></div>
     <div class="frow"><label>API key <span class="note" id="stKeyNow"></span></label><input id="stKey" type="password" placeholder="粘贴新的 key;留空=沿用现在的" autocomplete="off"></div>
-    <div class="frow"><label>模型</label><input id="stModel" list="stModels" placeholder="模型名"><datalist id="stModels"></datalist></div>
+    <div class="frow"><label>模型 <span class="note">名字要和平台一致,不确定就点右边列出来选</span></label><div style="display:flex;gap:8px"><input id="stModel" list="stModels" placeholder="模型名" style="flex:1"><button class="btn btn-ghost btn-sm" id="stList" type="button" title="用上面的地址和 key 向平台要模型列表">列出可用模型</button></div><datalist id="stModels"></datalist><div class="note" id="stListMsg"></div></div>
     <div class="frow"><label>手机版链接 <span class="note">用于「移交手机」:在手机版页面复制整条专属链接粘到这里</span></label><input id="stPhone" placeholder="https://…/live/?k=…(没有就留空)" autocomplete="off"></div>
     <div class="mrow"><button class="btn btn-ghost btn-sm" id="stTest">测试连接</button><span class="sp" id="stMsg"></span><button class="btn btn-ghost btn-sm" id="stCancel">取消</button><button class="btn btn-pri btn-sm" id="stSave">保存</button></div>
   </div>
@@ -647,6 +647,7 @@ function fillProv(apply){
   $("#stKeyUrl").innerHTML=p.key_url?`去哪里拿 key:<a href="${esc(p.key_url)}" target="_blank">${esc(p.key_url)}</a>`:($("#stProv").value==="ollama"?"本机跑模型,不要 key;先装 Ollama 并 pull 一个模型":"填任何 OpenAI 兼容的地址");
 }
 $("#stProv").onchange=()=>fillProv(true);
+$("#stList").onclick=async()=>{ const m=$("#stListMsg"); m.textContent="正在向平台要列表…"; const j=await post("/settings/models",stForm()); if(j.ok){ $("#stModels").innerHTML=j.models.map(x=>`<option value="${esc(x)}">`).join(""); m.textContent="拿到 "+j.models.length+" 个模型,点模型框从下拉里选"; if(!$("#stModel").value){ $("#stModel").value=j.models.find(x=>/deepseek-chat|deepseek-flash|DeepSeek-V3|qwen-plus|gpt-4o-mini/i.test(x))||j.models[0]; } } else m.textContent=j.msg||"没拿到"; };
 function stForm(){ return {provider:$("#stProv").value, base_url:$("#stBase").value, model:$("#stModel").value, api_key:$("#stKey").value, keep_key:!$("#stKey").value, phone_link:$("#stPhone").value.trim()}; }
 $("#stTest").onclick=async()=>{ const m=$("#stMsg"); m.className="sp"; m.textContent="测试中…"; $("#stTest").disabled=true; const j=await post("/settings/test",stForm()); $("#stTest").disabled=false;
   if(j.ok){ m.className="sp ok"; m.textContent=`通了,${j.ms} ms,模型回:${j.reply}`; } else { m.className="sp err"; m.textContent=j.msg||"失败"; } };

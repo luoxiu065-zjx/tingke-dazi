@@ -9,7 +9,7 @@ import os, re, threading
 
 PROVIDERS = {
     "deepseek": {"name": "DeepSeek", "base_url": "https://api.deepseek.com", "model": "deepseek-chat",
-                 "models": ["deepseek-chat", "deepseek-reasoner"], "key_url": "https://platform.deepseek.com/api_keys", "balance": True},
+                 "models": ["deepseek-chat", "deepseek-flash", "deepseek-v4-pro", "deepseek-reasoner"], "key_url": "https://platform.deepseek.com/api_keys", "balance": True},
     "qwen":     {"name": "通义千问(阿里百炼)", "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "model": "qwen-plus",
                  "models": ["qwen-plus", "qwen-turbo", "qwen-max"], "key_url": "https://bailian.console.aliyun.com/?apiKey=1", "balance": False},
     "moonshot": {"name": "Moonshot(Kimi)", "base_url": "https://api.moonshot.cn/v1", "model": "moonshot-v1-8k",

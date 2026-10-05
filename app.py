@@ -1139,6 +1139,25 @@ def settings_test():
     except Exception as e:
         return jsonify({"ok": False, "msg": "连不上:%s" % str(e)[:200]}), 400
 
+@app.route("/settings/models", methods=["POST"])
+def settings_models():
+    """「列出可用模型」:用表单里的地址和 key 向平台要模型列表(OpenAI 兼容接口都有 /models),省得猜模型名。"""
+    d = request.get_json(force=True, silent=True) or {}
+    base_url = (d.get("base_url") or "").strip().rstrip("/")
+    key = (d.get("api_key") or "").strip() or (DEEPSEEK_KEY if d.get("keep_key") else "")
+    if not re.match(r"^https?://", base_url):
+        return jsonify({"ok": False, "msg": "先填接口地址"}), 400
+    try:
+        from openai import OpenAI
+        c = OpenAI(api_key=key or "ollama", base_url=base_url)
+        ids = sorted({m.id for m in c.models.list().data if getattr(m, "id", "")})
+        if not ids:
+            return jsonify({"ok": False, "msg": "平台没返回模型列表,去它的文档里查模型名"}), 400
+        return jsonify({"ok": True, "models": ids[:200]})
+    except Exception as e:
+        return jsonify({"ok": False, "msg": "拿不到列表(这家平台可能不支持),去它的文档里查:%s" % str(e)[:120]}), 400
+
+
 @app.route("/settings", methods=["POST"])
 def settings_save():
     """保存到 .env 并热生效(翻译/总结/问答下一次调用起用新模型)。"""
