@@ -209,6 +209,7 @@ body.wide .bar{padding-right:300px}
   <div class="courses" id="courses"></div>
   <button class="btn btn-sun" id="startBtn" disabled>🎙 开始录制</button>
   <div class="hint" id="hint">先选课程</div>
+  <label class="qa-sw" style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:14px;color:var(--ink2)"><input type="checkbox" id="qaOnM" style="width:18px;height:18px">老师提问时自动给中英文参考回答 <small style="color:var(--ink3)">(会多用一点 DeepSeek)</small></label>
   <details class="prev" id="prev" style="display:none"><summary>上节课讲到哪</summary><pre id="prevText"></pre></details>
 </section>
 
@@ -274,13 +275,16 @@ async function post(p,body){const r=await fetch(api(p),{method:"POST",headers:{"
 function fmt(s){s=Math.max(0,Math.floor(s));const p=n=>String(n).padStart(2,"0");return p(s/3600|0)+":"+p(s%3600/60|0)+":"+p(s%60);}
 /* 视图:宽屏三块并排 / 窄屏一个个切。默认按屏幕宽度,点按钮可手动切,记住选择 */
 function applyView(){
-  const forced=localStorage.getItem("view");
-  const wide = forced ? forced==="wide" : (innerWidth>=1000 && innerWidth>innerHeight*0.9);
-  document.body.classList.toggle("wide", wide);
-  const b=$("#viewBtn"); if(b){ b.textContent = "⊞ 宽屏视图"; b.style.display = (!wide && innerWidth>=820 && $("#live").style.display==="block") ? "inline-block" : "none"; }
-  const b2=$("#viewBtn2"); if(b2) b2.style.display = wide ? "inline-block" : "none";
-  if(wide) document.querySelectorAll(".pane").forEach(p=>p.classList.add("on"));
+  document.body.classList.remove("wide");
+  const b=$("#viewBtn"); if(b){ b.textContent="🖥 电脑布局"; b.style.display = K ? "inline-block" : "none"; }
+  const b2=$("#viewBtn2"); if(b2) b2.style.display="none";
 }
+async function goDesk(){
+  try{ localStorage.setItem("view","desk"); }catch(e){}
+  if(recording && !paused){ try{ await stopMic(); await post("pause",{sid}); }catch(e){} }   // 先把这一句传完、暂停,电脑布局里点「继续」接着录
+  location.href="/live/desk";
+}
+function wantDesk(){ let v=null; try{ v=localStorage.getItem("view"); }catch(e){} return v==="desk" || (v!=="phone" && innerWidth>=900); }
 addEventListener("resize", applyView);
 function show(id){document.querySelectorAll(".scr").forEach(x=>x.classList.toggle("on",x.id===id)); $("#live").style.display=id==="live"?"block":"none"; $("#gearBtn").style.display=(id==="setup")?"inline-block":"none"; window.scrollTo(0,0); applyView();}
 async function copy(t,btn){try{await navigator.clipboard.writeText(t);if(btn){const o=btn.textContent;btn.textContent="已复制";setTimeout(()=>btn.textContent=o,1500);}}catch(e){prompt("长按复制",t);}}
@@ -300,8 +304,12 @@ async function loadConfig(freshUser=false){
   document.querySelectorAll(".course:not(.add)").forEach(b=>b.onclick=()=>{document.querySelectorAll(".course").forEach(x=>x.classList.remove("on"));b.classList.add("on");chosen=courses[+b.dataset.i];$("#startBtn").disabled=false;$("#hint").textContent="将录制:"+chosen;loadPrev();});
   $("#addCourse").onclick=async()=>{ const v=prompt("课号 名称,例如:COMP6246 机器学习"); if(!v||!v.trim())return; await post("settings",{courses:[...courses,v.trim()]}); loadConfig(); };
   fillWizard();
+  const wantSettings=new URL(location.href).searchParams.get("settings")==="1";
+  if(wantSettings){ history.replaceState(null,"",location.pathname); }
+  else if(!freshUser && wantDesk() && (ME.owner || ME.groq_key_tail || localStorage.getItem("wizard_done"))){ location.replace("/live/desk"); return; }
   if(c.active){ sid=c.active.sid; chosen=c.active.course; elapsedBase=c.active.elapsed||0; enterLive(); toast("接上了正在录的这节课,点「继续」接着录"); setPaused(true,false); return; }
-  if(freshUser || (!ME.owner && !ME.groq_key_tail && !localStorage.getItem("wizard_done"))){ gotoStep(1); show("wizard"); } else show("setup");
+  $("#qaOnM").checked=!!ME.auto_qa;
+  if(wantSettings || freshUser || (!ME.owner && !ME.groq_key_tail && !localStorage.getItem("wizard_done"))){ gotoStep(1); show("wizard"); } else show("setup");
 }
 async function loadPrev(){ const r=await fetch(api("prev?course="+encodeURIComponent(chosen))); const j=await r.json().catch(()=>({})); if(j.text){$("#prev").style.display="block";$("#prevText").textContent=j.text;} else $("#prev").style.display="none"; }
 
@@ -331,9 +339,9 @@ $("#w2Next").onclick=async()=>{ const sync={mode:syncMode}; if(syncMode==="webda
 $("#w3Back").onclick=()=>gotoStep(2);
 $("#testNote").onclick=async()=>{ $("#testMsg").textContent="发送中…"; const j=await post("sync/testnote",{}); $("#testMsg").innerHTML=`<span class="${j.ok?"ok":"bad"}">${esc(j.msg)}</span>`; };
 $("#w3Done").onclick=async()=>{ const cs=$("#coursesIn").value.split("\n").map(x=>x.trim()).filter(Boolean); await post("settings",{courses:cs.length?cs:["其他"]}); localStorage.setItem("wizard_done","1"); $("#linkbar").style.display="none"; await loadConfig(); show("setup"); };
+$("#qaOnM").onchange=()=>post("settings",{auto_qa:$("#qaOnM").checked});
 $("#gearBtn").onclick=()=>{ fillWizard(); gotoStep(1); show("wizard"); };
-const toggleView=()=>{ localStorage.setItem("view", document.body.classList.contains("wide")?"tab":"wide"); applyView(); };
-$("#viewBtn").onclick=toggleView; $("#viewBtn2").onclick=toggleView;
+$("#viewBtn").onclick=goDesk; $("#viewBtn2").onclick=goDesk;
 async function loadRecords(){ const r=await fetch(api("records")); const j=await r.json().catch(()=>({items:[]})); $("#recList").innerHTML=(j.items||[]).length?j.items.map(it=>`<div class="rec-item"><span>${esc(it.name)}</span><a href="${api("record?f="+encodeURIComponent(it.rel))}">下载</a></div>`).join(""):`<div class="mut">还没有记录</div>`; }
 
 /* ---------- 录音:按停顿切段,每段单独一个文件传给服务器 ---------- */

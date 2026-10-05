@@ -91,6 +91,11 @@ class Users:
             for k in ("ds_base", "ds_model", "name"):
                 if data.get(k) is not None:
                     u[k] = str(data[k]).strip()[:200]
+            if data.get("ds_provider") is not None:
+                u["ds_provider"] = str(data["ds_provider"]).strip()[:40]
+            for k in ("auto_qa", "context_on"):
+                if k in data:
+                    u[k] = bool(data[k])
             if isinstance(data.get("courses"), list):
                 cs = [re.sub(r"\s+", " ", str(c)).strip()[:60] for c in data["courses"]]
                 cs = [c for c in cs if c]
@@ -123,7 +128,8 @@ class Users:
         return {"uid": u["uid"], "name": u.get("name", ""), "owner": bool(u.get("owner")),
                 "groq_key_tail": u["groq_key"][-4:] if u["groq_key"] else "", "ds_key_tail": u["ds_key"][-4:] if u["ds_key"] else "",
                 "ds_base": u.get("ds_base", ""), "ds_model": u.get("ds_model", ""), "courses": u["courses"], "sync": sync,
-                "trial_left": max(0, TRIAL_SECONDS - int(u.get("trial_used", 0))), "trial_total": TRIAL_SECONDS}
+                "trial_left": max(0, TRIAL_SECONDS - int(u.get("trial_used", 0))), "trial_total": TRIAL_SECONDS,
+                "auto_qa": bool(u.get("auto_qa", bool(u.get("owner")))), "context_on": bool(u.get("context_on", True))}
 
     # ---------- 试用额度 ----------
     def trial_ok(self, u, need=0):
