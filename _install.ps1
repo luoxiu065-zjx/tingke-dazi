@@ -21,6 +21,8 @@ try {
     if (!(Test-Path "python\python.exe")) { Fail "下载 Python" }
     (Get-Content "python\python312._pth") -replace "^#import site", "import site" | Set-Content "python\python312._pth"
   }
+  # 嵌入版 Python 的 ._pth 不会把程序目录放进搜索路径,app.py 会找不到旁边的 session.py 等模块;加一行 ".."(= 程序目录)
+  if (!(Select-String -Path "python\python312._pth" -Pattern "^\.\.$" -Quiet)) { Add-Content "python\python312._pth" ".." }
   if (!(Test-Path "python\Scripts\pip.exe")) {
     Write-Host "[2/4] 安装 pip..."
     Invoke-WebRequest "https://bootstrap.pypa.io/get-pip.py" -OutFile "get-pip.py"

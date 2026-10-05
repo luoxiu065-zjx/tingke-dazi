@@ -21,5 +21,8 @@ if (!(Test-Path (Join-Path $d "python\python.exe")) -and !(Test-Path (Join-Path 
   Write-Host "还没有安装,请先双击「安装.bat」。"
   exit 1
 }
+# 老版本安装包装出来的 python\python312._pth 少一行 "..",app.py 会找不到旁边的模块;这里补上
+$pth = Join-Path $d "python\python312._pth"
+if ((Test-Path $pth) -and !(Select-String -Path $pth -Pattern "^\.\.$" -Quiet)) { Add-Content $pth ".." }
 Write-Host "启动中... 浏览器会打开 http://127.0.0.1:$port ;第一次要下载语音模型,请等几分钟。关掉这个窗口就停止。"
 exit 0
