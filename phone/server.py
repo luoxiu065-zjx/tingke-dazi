@@ -22,7 +22,7 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(BASE, ".env"))
 TOKEN = os.getenv("ACCESS_TOKEN", "").strip()
 GROQ_KEY = os.getenv("GROQ_API_KEY", "").strip()
-GROQ_MODEL = os.getenv("GROQ_MODEL", "whisper-large-v3-turbo")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "whisper-large-v3")      # 2026-10-05:非 turbo 版更准,Groq 免费档额度相同;要快可在 .env 改回 whisper-large-v3-turbo
 DS_KEY = os.getenv("DEEPSEEK_API_KEY", "").strip()
 DS_BASE = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 DS_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")

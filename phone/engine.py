@@ -58,6 +58,13 @@ def clean_text(text):
     """去掉 Whisper 的点点点和静音复读幻觉;只剩标点的返回空串。"""
     text = re.sub(r"(\s*\.){3,}", " …", text).strip()
     text = re.sub(r"(\b.{4,40}?)(?:[\s…,.]*\1){2,}", r"\1", text)
+    # 2026-10-05:whisper-large-v3 会把 um / uh 这类语气词原样写出来,去掉(只删语气词本身,句子其余不动)
+    text = re.sub(r"(?i)(?:^|(?<=[\s,.;:(]))(?:um+|uh+|uhm+|erm?|hmm+|mm+)\b[,.]?\s*", "", text)
+    text = re.sub(r"\s{2,}", " ", text)
+    text = re.sub(r"\s+([,.;:?!])", r"\1", text)
+    text = re.sub(r"^[,.;:\s]+", "", text).strip()
+    if text[:1].islower():
+        text = text[0].upper() + text[1:]
     if not re.search(r"[A-Za-z]{2,}", text):
         return ""
     return text

@@ -293,8 +293,9 @@ function levelLoop(){
   if(rms>=thr){ voiced+=0.1; silence=0; } else silence+=0.1;
   const len=(performance.now()-cycleStart)/1000;
   rec._voiced=voiced;
-  if((voiced>=0.8&&silence>=0.7)||(len>=12&&voiced>=0.8)) rec.stop();
-  else if(voiced<0.8&&len>=3) rec.stop();
+  // 2026-10-05:停顿 1.2 秒才切一段(原 0.7 秒切得太碎,出一堆半句),单段最长 20 秒
+  if((voiced>=0.8&&silence>=1.2)||(len>=20&&voiced>=0.8)) rec.stop();
+  else if(voiced<0.8&&len>=4) rec.stop();
 }
 function elapsedNow(){ return elapsedBase+(startedAt?(performance.now()-startedAt)/1000:0); }
 async function upload(blob,t0,dur){
