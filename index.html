@@ -238,7 +238,7 @@
     <div class="frow"><label>提供商</label><select id="stProv"></select><div class="note" id="stKeyUrl"></div></div>
     <div class="frow"><label>接口地址</label><input id="stBase" placeholder="https://…"></div>
     <div class="frow"><label>API key <span class="note" id="stKeyNow"></span></label><input id="stKey" type="password" placeholder="粘贴新的 key;留空=沿用现在的" autocomplete="off"></div>
-    <div class="frow"><label>模型 <span class="note">名字要和平台一致,不确定就点右边列出来选</span></label><div style="display:flex;gap:8px"><input id="stModel" list="stModels" placeholder="模型名" style="flex:1"><button class="btn btn-ghost btn-sm" id="stList" type="button" title="用上面的地址和 key 向平台要模型列表">列出可用模型</button></div><datalist id="stModels"></datalist><div class="note" id="stListMsg"></div></div>
+    <div class="frow"><label>模型 <span class="note">先选提供商,这里就是它家的模型;填了 key 会自动向平台要最新列表</span></label><div style="display:flex;gap:8px"><select id="stModelSel" style="flex:1"></select><button class="btn btn-ghost btn-sm" id="stList" type="button" title="用上面的地址和 key 向平台要最新模型列表">刷新列表</button></div><input id="stModel" placeholder="手动输入模型名(要和平台写法一致)" style="display:none;margin-top:6px"><div class="note" id="stListMsg"></div></div>
     <div class="frow"><label>手机版链接 <span class="note">用于「移交手机」:在手机版页面复制整条专属链接粘到这里</span></label><input id="stPhone" placeholder="https://…/live/?k=…(没有就留空)" autocomplete="off"></div>
     <div class="mrow"><button class="btn btn-ghost btn-sm" id="stTest">测试连接</button><span class="sp" id="stMsg"></span><button class="btn btn-ghost btn-sm" id="stCancel">取消</button><button class="btn btn-pri btn-sm" id="stSave">保存</button></div>
   </div>
@@ -635,20 +635,41 @@ async function openSettings(){
   ST=await (await fetch("/settings")).json();
   $("#stProv").innerHTML=Object.entries(ST.providers).map(([k,v])=>`<option value="${k}">${esc(v.name)}</option>`).join("");
   $("#stProv").value=ST.provider in ST.providers?ST.provider:"custom";
-  $("#stBase").value=ST.base_url; $("#stModel").value=ST.model; $("#stKey").value=""; $("#stPhone").value=ST.phone_link||"";
+  $("#stBase").value=ST.base_url; $("#stModel").value=""; $("#stKey").value=""; $("#stPhone").value=ST.phone_link||"";
   $("#stKeyNow").textContent=ST.has_key?("现在:"+ST.key_masked):"(还没填)";
   fillProv(false); $("#stMsg").textContent=""; $("#stMsg").className="sp";
   $("#settings").classList.add("on"); setTimeout(()=>$("#stKey").focus(),100);
 }
+const CUSTOM="__custom__"; let fetchedModels=null;
+function curModel(){ const v=$("#stModelSel").value; return v===CUSTOM?$("#stModel").value.trim():v; }
+function setModelOptions(list, current){
+  const seen=new Set(); const items=[]; for(const m of list||[]){ if(m&&!seen.has(m)){ seen.add(m); items.push(m); } }
+  if(current&&!seen.has(current)){ items.unshift(current); seen.add(current); }
+  $("#stModelSel").innerHTML=items.map(m=>`<option value="${esc(m)}">${esc(m)}</option>`).join("")+`<option value="${CUSTOM}">其他(手动输入)</option>`;
+  $("#stModelSel").value=items.includes(current)?current:(items[0]||CUSTOM);
+  $("#stModel").style.display=$("#stModelSel").value===CUSTOM?"block":"none";
+}
+$("#stModelSel").onchange=()=>{ const c=$("#stModelSel").value===CUSTOM; $("#stModel").style.display=c?"block":"none"; if(c) setTimeout(()=>$("#stModel").focus(),50); };
+async function fetchModels(silent){
+  const m=$("#stListMsg"); if(!silent) m.textContent="正在向平台要列表…";
+  const f=stForm(); if(!f.base_url||(!f.api_key&&!f.keep_key&&f.provider!=="ollama")){ if(!silent) m.textContent="先填接口地址和 key"; return; }
+  const j=await post("/settings/models",f);
+  if(j.ok){ fetchedModels=j.models; const p=ST.providers[$("#stProv").value]||{}; setModelOptions([...(p.models||[]).filter(x=>j.models.includes(x)), ...j.models], curModel()||p.model); m.textContent="平台现在可用 "+j.models.length+" 个模型,已列在下拉里"; }
+  else if(!silent) m.textContent=j.msg||"没拿到列表,用预设的";
+}
 function fillProv(apply){
-  const p=ST.providers[$("#stProv").value]||{};
-  if(apply){ if(p.base_url) $("#stBase").value=p.base_url; if(p.model) $("#stModel").value=p.model; }
-  $("#stModels").innerHTML=(p.models||[]).map(m=>`<option value="${esc(m)}">`).join("");
+  const p=ST.providers[$("#stProv").value]||{}; fetchedModels=null; $("#stListMsg").textContent="";
+  if(apply){ if(p.base_url) $("#stBase").value=p.base_url; }
+  setModelOptions(p.models||[], apply?(p.model||""):(ST.model||p.model||""));
+  if($("#stModelSel").value===CUSTOM&&!apply) $("#stModel").value=ST.model||"";
   $("#stKeyUrl").innerHTML=p.key_url?`去哪里拿 key:<a href="${esc(p.key_url)}" target="_blank">${esc(p.key_url)}</a>`:($("#stProv").value==="ollama"?"本机跑模型,不要 key;先装 Ollama 并 pull 一个模型":"填任何 OpenAI 兼容的地址");
+  // 已经有 key(或本机 Ollama)就顺手向平台要一次最新列表,用户不用自己点
+  if(ST.has_key||$("#stProv").value==="ollama") fetchModels(true);
 }
 $("#stProv").onchange=()=>fillProv(true);
-$("#stList").onclick=async()=>{ const m=$("#stListMsg"); m.textContent="正在向平台要列表…"; const j=await post("/settings/models",stForm()); if(j.ok){ $("#stModels").innerHTML=j.models.map(x=>`<option value="${esc(x)}">`).join(""); m.textContent="拿到 "+j.models.length+" 个模型,点模型框从下拉里选"; if(!$("#stModel").value){ $("#stModel").value=j.models.find(x=>/deepseek-chat|deepseek-flash|DeepSeek-V3|qwen-plus|gpt-4o-mini/i.test(x))||j.models[0]; } } else m.textContent=j.msg||"没拿到"; };
-function stForm(){ return {provider:$("#stProv").value, base_url:$("#stBase").value, model:$("#stModel").value, api_key:$("#stKey").value, keep_key:!$("#stKey").value, phone_link:$("#stPhone").value.trim()}; }
+$("#stList").onclick=()=>fetchModels(false);
+$("#stKey").addEventListener("change",()=>{ if($("#stKey").value.trim().length>8) fetchModels(true); });
+function stForm(){ return {provider:$("#stProv").value, base_url:$("#stBase").value, model:curModel(), api_key:$("#stKey").value, keep_key:!$("#stKey").value, phone_link:$("#stPhone").value.trim()}; }
 $("#stTest").onclick=async()=>{ const m=$("#stMsg"); m.className="sp"; m.textContent="测试中…"; $("#stTest").disabled=true; const j=await post("/settings/test",stForm()); $("#stTest").disabled=false;
   if(j.ok){ m.className="sp ok"; m.textContent=`通了,${j.ms} ms,模型回:${j.reply}`; } else { m.className="sp err"; m.textContent=j.msg||"失败"; } };
 $("#stSave").onclick=async()=>{ const m=$("#stMsg"); const j=await post("/settings",stForm()); if(j.ok){ $("#settings").classList.remove("on"); loadBalance(true); } else { m.className="sp err"; m.textContent=j.msg||"保存失败"; } };
