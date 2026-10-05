@@ -325,7 +325,7 @@ def _recognize_one(model):
                             and not (getattr(s, "compression_ratio", 0) or 0) > 2.4).strip()   # 复读式幻觉(「秘密的秘密的…」)压缩比会很高,整段丢
             # 已经指定了英文识别,输出里的中文/日文字符只可能是幻觉(有人对着它说中文、或噪音太大),直接去掉;同一短语连续重复只留一次
             text = re.sub(r"[぀-ヿ㐀-鿿＀-￯]+", " ", text)
-            text = re.sub(r"(.{3,40}?)(?:[\s,.…]*){2,}", r"", text)
+            text = re.sub(r"(\b.{3,40}?)(?:[\s,.…]*\1){2,}", r"\1", text)
             text = re.sub(r"\s{2,}", " ", text).strip(" ,.")
         except Exception as e:
             status("识别出错:%s" % e, "error"); return
