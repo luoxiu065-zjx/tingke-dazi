@@ -267,7 +267,7 @@ if(K){ localStorage.setItem("k",K); if(u.searchParams.get("k")){ history.replace
 const api=(p)=>"/live/"+p+(p.includes("?")?"&":"?")+"k="+encodeURIComponent(K);
 const myLink=()=>location.origin+location.pathname+"?k="+encodeURIComponent(K);
 let ME=null, courses=[], chosen=null, sid=null, es=null, seq=0, recording=false, paused=false, tick=null, elapsedBase=0, startedAt=0;
-let stream=null, actx=null, analyser=null, rec=null, mime="", voiced=0, silence=0, cycleStart=0, levelTimer=null, wake=null, fromSettings=false, noSoundWarned=false, cycleCount=0, floorR=0.02, peak=0;
+let stream=null, actx=null, srcNode=null, proc=null, sink=null, mime="audio/wav", inRate=48000, wake=null, fromSettings=false, noSoundWarned=false, peak=0, gotAudio=false, pcm=[], pcmLen=0, rawMax=0, segT0=0, segVoiced=0, segSilence=0, segMax=0, pending=Promise.resolve();
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 function toast(msg,level="",link=null){const t=$("#toast");t.className=level;t.innerHTML=esc(msg)+(link?`<a href="${esc(link)}">打开</a>`:"");t.style.display="block";clearTimeout(t._h);if(level!=="error")t._h=setTimeout(()=>t.style.display="none",link?12000:5000);}
 async function post(p,body){const r=await fetch(api(p),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})});const j=await r.json().catch(()=>({}));if(!r.ok)toast(j.msg||("出错 "+r.status),"error");return j;}
@@ -338,50 +338,81 @@ async function loadRecords(){ const r=await fetch(api("records")); const j=await
 
 /* ---------- 录音:按停顿切段,每段单独一个文件传给服务器 ---------- */
 async function startMic(){
-  stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:true,autoGainControl:true}});
-  actx=new (window.AudioContext||window.webkitAudioContext)(); const src=actx.createMediaStreamSource(stream); analyser=actx.createAnalyser(); analyser.fftSize=1024; src.connect(analyser);
-  try{ await actx.resume(); }catch(e){}     // iPhone Safari 上 AudioContext 常是挂起状态,读到的音量永远是 0,必须主动唤醒
-  noSoundWarned=false; cycleCount=0; floorR=0.02; peak=0;
-  mime=["audio/webm;codecs=opus","audio/webm","audio/mp4","audio/ogg;codecs=opus"].find(m=>window.MediaRecorder&&MediaRecorder.isTypeSupported(m))||"";
-  if(!mime) throw new Error("这个浏览器不支持录音,试试 Chrome 或 Safari 最新版");
-  startCycle(); levelTimer=setInterval(levelLoop,100);
-  try{ wake=await navigator.wakeLock?.request("screen"); }catch(e){}
+  // 先在点击的同一刻建好并唤醒 AudioContext(iPhone 只认用户点击里发起的 resume),再要麦克风
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if(!AC || !navigator.mediaDevices) throw new Error("这个浏览器不支持录音,请用 Safari / Chrome / Edge 打开(别在微信里打开)");
+  actx = new AC(); try{ actx.resume(); }catch(e){}
+  stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:true,autoGainControl:true}});
+  try{ await actx.resume(); }catch(e){}
+  buildGraph(); newSeg(); gotAudio = false; noSoundWarned = false; peak = 0; rawMax = 0;
+  setTimeout(async () => {
+    if(!recording || paused || !stream) return;
+    if(!gotAudio || rawMax === 0){                       // 没回调,或者回调里全是 0(个别 iPhone 会这样):换个新的音频环境再接一次
+      try{ proc.onaudioprocess = null; srcNode.disconnect(); proc.disconnect(); sink.disconnect(); actx.close(); }catch(e){}
+      const AC2 = window.AudioContext || window.webkitAudioContext; actx = new AC2(); try{ await actx.resume(); }catch(e){}
+      buildGraph(); newSeg();
+      setTimeout(() => { if(recording && !paused && (!gotAudio || rawMax === 0)) toast("麦克风没有声音数据:请确认浏览器允许了麦克风;手机上别用微信 / QQ 里打开,用 Safari 或 Chrome", "error"); }, 3000);
+    }
+  }, 3000);
+  try{ wake = await navigator.wakeLock?.request("screen"); }catch(e){}
 }
-function startCycle(){
-  const r=rec=new MediaRecorder(stream,{mimeType:mime}); const parts=[]; const myT0=elapsedNow(); const t0=performance.now(); cycleStart=t0; voiced=0; silence=0; r._max=0; cycleCount++;
-  r.ondataavailable=e=>{ if(e.data&&e.data.size) parts.push(e.data); };
-  // onstop 是异步到的,用闭包里的 r,别碰全局 rec(可能已经换成下一段或被 stopMic 清成 null)
-  r.onstop=()=>{ const had=r._voiced||0; if((had>=0.8||r._dead) && parts.length){ upload(new Blob(parts,{type:mime}), myT0, (performance.now()-t0)/1000); } if(recording&&!paused&&rec===r) startCycle(); };
-  r.start();
+function buildGraph(){
+  inRate = actx.sampleRate;
+  srcNode = actx.createMediaStreamSource(stream);
+  proc = actx.createScriptProcessor(4096, 1, 1);
+  sink = actx.createGain(); sink.gain.value = 0;          // 必须接到输出才会持续回调;音量 0,不会从喇叭放出来
+  srcNode.connect(proc); proc.connect(sink); sink.connect(actx.destination);
+  proc.onaudioprocess = e => { gotAudio = true; if(!recording || paused) return; onAudio(new Float32Array(e.inputBuffer.getChannelData(0))); };
 }
-function levelLoop(){
-  if(!analyser||!rec||rec.state!=="recording") return;
-  const buf=new Float32Array(analyser.fftSize); analyser.getFloatTimeDomainData(buf);
-  let s=0; for(const v of buf) s+=v*v; const rms=Math.sqrt(s/buf.length);
-  peak=Math.max(peak*0.995, rms);
-  $("#lv").style.width=Math.min(100,Math.sqrt(rms)*320)+"%";
-  // 本底噪声:慢慢向下贴,安静时降,说话时几乎不动。阈值 = 本底的 2.5 倍,最低 0.0025
-  floorR = rms < floorR ? (floorR*0.9 + rms*0.1) : (floorR*0.999 + rms*0.001);
-  const thr=Math.max(0.0025, floorR*2.5);
-  if(rms>=thr){ voiced+=0.1; silence=0; } else silence+=0.1;
-  const len=(performance.now()-cycleStart)/1000;
-  rec._voiced=voiced; rec._max=Math.max(rec._max||0,rms);
-  // 分析器完全读不到(AudioContext 没在跑/读数恒为 0),或者录了 25 秒还一段没传上去:不再靠人声判断,按时间切,全部上传让服务器去听
-  const blind=(actx&&actx.state!=="running")||(len>=6&&rec._max<1e-6)||(seq===0&&elapsedNow()>25);
-  rec._dead=blind;
-  if(blind){ if(len>=10) rec.stop(); return; }
-  if(!noSoundWarned&&elapsedNow()>14&&peak<0.002){ noSoundWarned=true; toast("几乎没听到声音:确认浏览器允许了麦克风,手机别用微信/QQ 内置浏览器,离声源近一点","error"); }
-  if((voiced>=0.8&&silence>=1.2)||(len>=20&&voiced>=0.8)) rec.stop();
-  else if(voiced<0.8&&len>=6) rec.stop();
+const VTHR = 0.006, MAXSEG = 15;
+function newSeg(){ pcm = []; pcmLen = 0; segVoiced = 0; segSilence = 0; segMax = 0; segT0 = elapsedNow(); }
+function onAudio(x){
+  let s2 = 0; for(let i = 0; i < x.length; i++) s2 += x[i] * x[i];
+  const rms = Math.sqrt(s2 / x.length), dt = x.length / inRate;
+  peak = Math.max(peak * 0.98, rms); $("#lv").style.width = Math.min(100, Math.sqrt(rms) * 320) + "%";
+  if(!pcmLen) segT0 = elapsedNow();
+  if(rms > rawMax) rawMax = rms;
+  pcm.push(x); pcmLen += x.length; segMax = Math.max(segMax, rms);
+  if(rms >= VTHR){ segVoiced += dt; segSilence = 0; } else segSilence += dt;
+  const len = pcmLen / inRate;
+  if((segVoiced >= 0.6 && segSilence >= 1.0 && len >= 2) || len >= MAXSEG) flushSeg();
+  if(!noSoundWarned && elapsedNow() > 14 && peak < 0.0015){ noSoundWarned = true; toast("几乎没听到声音:离声源近一点,或检查麦克风权限", "error"); }
+}
+function flushSeg(){
+  const len = pcmLen / inRate, t0 = segT0, chunks = pcm, n = pcmLen, mx = segMax;
+  newSeg();
+  if(n && len >= 0.8 && mx >= 0.0015){ const wav = encodeWav(chunks, n, inRate, 16000); pending = pending.then(() => upload(wav, t0, len)); }
+  return pending;
+}
+function encodeWav(chunks, n, inR, outR){
+  const flat = new Float32Array(n); let o = 0; for(const c of chunks){ flat.set(c, o); o += c.length; }
+  const ratio = inR / outR, m = Math.floor(n / ratio), out = new Int16Array(m);
+  for(let i = 0; i < m; i++){
+    const a = Math.floor(i * ratio), b = Math.min(n, Math.floor((i + 1) * ratio)); let s3 = 0;
+    for(let j = a; j < b; j++) s3 += flat[j];
+    out[i] = Math.max(-1, Math.min(1, s3 / Math.max(1, b - a))) * 0x7fff;
+  }
+  const buf = new ArrayBuffer(44 + m * 2), dv = new DataView(buf);
+  const w = (p, t) => { for(let i = 0; i < t.length; i++) dv.setUint8(p + i, t.charCodeAt(i)); };
+  w(0, "RIFF"); dv.setUint32(4, 36 + m * 2, true); w(8, "WAVE"); w(12, "fmt "); dv.setUint32(16, 16, true);
+  dv.setUint16(20, 1, true); dv.setUint16(22, 1, true); dv.setUint32(24, outR, true); dv.setUint32(28, outR * 2, true);
+  dv.setUint16(32, 2, true); dv.setUint16(34, 16, true); w(36, "data"); dv.setUint32(40, m * 2, true);
+  new Int16Array(buf, 44).set(out);
+  return new Blob([buf], {type: "audio/wav"});
 }
 function elapsedNow(){ return elapsedBase+(startedAt?(performance.now()-startedAt)/1000:0); }
 async function upload(blob,t0,dur){
-  const fd=new FormData(); fd.append("sid",sid); fd.append("seq",String(seq++)); fd.append("t0",String(t0.toFixed(1))); fd.append("dur",String(dur.toFixed(1))); fd.append("mime",mime);
-  fd.append("file",blob,"chunk."+(mime.includes("mp4")?"mp4":mime.includes("ogg")?"ogg":"webm"));
+  const fd=new FormData(); fd.append("sid",sid); fd.append("seq",String(seq++)); fd.append("t0",String(t0.toFixed(1))); fd.append("dur",String(dur.toFixed(1))); fd.append("mime","audio/wav");
+  fd.append("file",blob,"chunk.wav");
   try{ const r=await fetch(api("chunk"),{method:"POST",body:fd}); if(!r.ok) toast("上传失败 "+r.status,"error"); }catch(e){ toast("网络断了,这一段没传上去","error"); }
 }
-function stopMic(){ clearInterval(levelTimer); try{rec&&rec.state!=="inactive"&&(rec._voiced=voiced,rec.stop());}catch(e){} stream?.getTracks().forEach(t=>t.stop()); actx?.close(); wake?.release?.(); stream=actx=rec=null; }
-
+function stopMic(){
+  try{ if(pcmLen) flushSeg(); }catch(e){}                    // 最后一句别丢
+  try{ if(proc){ proc.onaudioprocess = null; proc.disconnect(); } if(srcNode) srcNode.disconnect(); if(sink) sink.disconnect(); }catch(e){}
+  stream?.getTracks().forEach(t => t.stop()); try{ actx?.close(); }catch(e){} wake?.release?.();
+  stream = actx = proc = srcNode = sink = null;
+  return pending;
+}
 /* ---------- 录制界面 ---------- */
 function enterLive(){
   show("live"); $("#chip").style.display="inline"; $("#chip").textContent=chosen.split(" ")[0];
@@ -402,7 +433,7 @@ $("#startBtn").onclick=async()=>{
   enterLive(); toast((j.trial?"试用额度中 · ":"")+"开始录制:"+chosen,"ok");
 };
 $("#pauseBtn").onclick=()=>setPaused(!paused);
-$("#stopBtn").onclick=async()=>{ if(!confirm("结束这节课并保存?")) return; recording=false; stopMic(); $("#stopBtn").disabled=true; $("#stopBtn").textContent="保存中…"; await post("stop",{sid}); };
+$("#stopBtn").onclick=async()=>{ if(!confirm("结束这节课并保存?")) return; $("#stopBtn").disabled=true; $("#stopBtn").textContent="保存中…"; await stopMic(); recording=false; await post("stop",{sid}); };
 $("#doneBack").onclick=()=>{ $("#stopBtn").disabled=false; $("#stopBtn").textContent="⏺ 结束并保存"; $("#startBtn").disabled=!chosen; loadConfig(); };
 document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("on"));t.classList.add("on");document.querySelectorAll(".pane").forEach(p=>p.classList.toggle("on",p.id===t.dataset.p));});
 document.addEventListener("visibilitychange",async()=>{ if(document.visibilityState==="visible"&&recording&&!paused&&!wake){ try{wake=await navigator.wakeLock?.request("screen");}catch(e){} } });
