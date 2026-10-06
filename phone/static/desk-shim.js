@@ -43,6 +43,7 @@
     try{ await mic.actx.resume(); }catch(e){}
     build(); newSeg(); mic.got = false; mic.rawMax = 0; mic.on = true;
     try{ mic.wake = await navigator.wakeLock?.request("screen"); }catch(e){}
+    try{ if(window.TKDraft) TKDraft.start(t => { try{ setDraft(t, ""); }catch(_){ } }); }catch(e){}
     setTimeout(async () => {          // 3 秒还没声音数据(或全是 0,个别 iPhone 会这样):换个新的音频环境再接一次
       if(!mic.on || (mic.got && mic.rawMax > 0)) return;
       teardownGraph(); try{ mic.actx.close(); }catch(e){}
@@ -101,6 +102,7 @@
   }
   // 停:把手里没说完的最后一句也传上去,等上传完再返回
   mic.stop = function(){
+    try{ window.TKDraft && TKDraft.stop(); }catch(e){}
     if(mic.on){ mic.base = mic.clock(); try{ if(mic.n) flush(); }catch(e){} }
     mic.on = false; teardownGraph();
     mic.release();

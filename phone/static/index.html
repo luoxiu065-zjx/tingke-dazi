@@ -103,6 +103,7 @@ body.wide .bar{padding-right:300px}
 .seg{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
 .seg .ts{font-family:var(--mono);font-size:11px;color:var(--ink3);min-width:52px;padding-top:3px}
 .seg .en{color:var(--ink)} .seg .zh{color:var(--ink2);font-size:14px;margin-top:3px}
+.seg.draft .en{color:var(--ink3);font-style:italic} .seg.draft .ts{opacity:.5}
 .seg.latest .en{background:var(--sun-soft);border-radius:6px;padding:0 4px}
 .sum-sec{margin-bottom:12px} .sum-sec .topic{font-weight:700;margin-bottom:4px} .sum-sec ul{margin:0;padding-left:18px} .sum-sec li{margin:2px 0;font-size:14px}
 .qa{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px;background:#fff}
@@ -261,6 +262,7 @@ body.wide .bar{padding-right:300px}
 </main>
 <div id="toast"></div>
 
+<script src="/live/static/draft.js"></script>
 <script>
 const $=s=>document.querySelector(s);
 const u=new URL(location.href); let K=u.searchParams.get("k")||localStorage.getItem("k")||"";
@@ -363,6 +365,7 @@ async function startMic(){
     }
   }, 3000);
   try{ wake = await navigator.wakeLock?.request("screen"); }catch(e){}
+  if(window.TKDraft) TKDraft.start(t => setDraft(t));
 }
 function buildGraph(){
   inRate = actx.sampleRate;
@@ -419,6 +422,7 @@ async function upload(blob,t0,dur){
   toast("网络不好,有一段没传上去","error");
 }
 function stopMic(){
+  try{ window.TKDraft && TKDraft.stop(); }catch(e){}
   try{ if(pcmLen) flushSeg(); }catch(e){}                    // 最后一句别丢
   try{ if(proc){ proc.onaudioprocess = null; proc.disconnect(); } if(srcNode) srcNode.disconnect(); if(sink) sink.disconnect(); }catch(e){}
   stream?.getTracks().forEach(t => t.stop()); try{ actx?.close(); }catch(e){} wake?.release?.();
@@ -453,7 +457,14 @@ document.addEventListener("visibilitychange",async()=>{ if(document.visibilitySt
 let nTrans=0,nQa=0;
 function addSeg(s){ if(document.getElementById("s"+s.id)) return; $("#transEmpty")?.remove(); document.querySelectorAll(".seg.latest").forEach(x=>x.classList.remove("latest"));
   const d=document.createElement("div"); d.className="seg latest"; d.id="s"+s.id; d.innerHTML=`<div class="ts">${esc(s.t)}</div><div><div class="en">${esc(s.en)}</div><div class="zh">${esc(s.zh||"")}</div></div>`;
-  $("#trans").appendChild(d); nTrans++; $("#nTrans").textContent=nTrans; if($("#trans").classList.contains("on")) window.scrollTo(0,document.body.scrollHeight); }
+  $("#trans").appendChild(d); const dr=document.getElementById("draft"); if(dr) $("#trans").appendChild(dr); nTrans++; $("#nTrans").textContent=nTrans; if($("#trans").classList.contains("on")) window.scrollTo(0,document.body.scrollHeight); }
+function setDraft(text){
+  const box=$("#trans"); let d=document.getElementById("draft");
+  if(!text){ d?.remove(); return; }
+  $("#transEmpty")?.remove();
+  if(!d){ d=document.createElement("div"); d.id="draft"; d.className="seg draft"; d.innerHTML='<div class="ts">…</div><div><div class="en"></div></div>'; }
+  box.appendChild(d); d.querySelector(".en").textContent=text;
+}
 function setZh(id,zh){ const e=document.querySelector("#s"+id+" .zh"); if(e) e.textContent=zh; }
 function renderSummary(items){ if(!items||!items.length) return; $("#sum").innerHTML=items.map(sec=>`<div class="sum-sec"><div class="topic">${esc(sec.topic)}</div><ul>`+(sec.points||[]).map(p=>`<li><b>${esc(p.k)}</b>:${esc(p.v)}</li>`).join("")+`</ul></div>`).join(""); }
 function addQA(q){ if(document.getElementById("qa"+q.id)) return; $("#qaEmpty")?.remove(); const d=document.createElement("div"); d.className="qa"; d.id="qa"+q.id;

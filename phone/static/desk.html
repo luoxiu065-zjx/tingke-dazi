@@ -204,6 +204,7 @@
   .ctx small{color:var(--mute);font-size:12px} .ctx a{color:var(--blue);cursor:pointer;font-size:12.5px}
   .ctx-text{max-height:52vh;overflow:auto;white-space:pre-wrap;font-size:13px;line-height:1.6;background:#F6F9FE;border:1px solid var(--line-cool);border-radius:10px;padding:12px 14px;color:var(--ink)}
   /* 状态条 */
+  .seg.draft .en{color:var(--ink3);font-style:italic} .seg.draft .ts{opacity:.5}
   #toast{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:12;background:#fff;border:1px solid var(--line);box-shadow:var(--shadow-md);border-radius:999px;padding:8px 16px;font-size:13.5px;color:var(--ink2);max-width:80vw;display:none}
   #toast.ok{color:var(--ok)} #toast.error{color:var(--red)}
   #toast a{color:var(--blue);cursor:pointer;margin-left:8px}
@@ -320,6 +321,7 @@
 <button id="selpop">译 选中的这段</button>
 <div id="toast"></div>
 
+<script src="/live/static/draft.js"></script>
 <script src="/live/static/desk-shim.js"></script>
 <script>
 const $ = s => document.querySelector(s);
@@ -512,6 +514,14 @@ function addSeg(s){
   d.innerHTML=`<div class="ts">${esc(s.t)}<small>${esc(s.clock)}</small></div><div><div class="en">${esc(s.en)}</div><div class="zh">${esc(s.zh||"")}</div></div>`;
   box.appendChild(d); if(stick) box.scrollTop=box.scrollHeight; bump("trans");
 }
+function setDraft(text, t){
+  const box=$("#trans"); let d=document.getElementById("draft");
+  if(!text){ d?.remove(); return; }
+  const stick=nearBottom(box); $("#transEmpty")?.remove();
+  if(!d){ d=document.createElement("div"); d.id="draft"; d.className="seg draft"; d.innerHTML=`<div class="ts"></div><div><div class="en"></div></div>`; }
+  box.appendChild(d); d.querySelector(".ts").textContent=t||""; d.querySelector(".en").textContent=text+" …";
+  if(stick) box.scrollTop=box.scrollHeight;
+}
 function setZh(id, zh){ const e=document.querySelector("#s"+id+" .zh"); if(!e) return; const box=$("#trans"), stick=nearBottom(box); e.textContent=zh; if(stick) box.scrollTop=box.scrollHeight; }
 function renderSummary(items){ if(!items||!items.length) return; $("#summary").innerHTML=items.map(sec=>`<div class="sum-sec"><div class="topic">${esc(sec.topic)}</div><ul>`+(sec.points||[]).map(p=>`<li><b>${esc(p.k)}</b>:${esc(p.v)}</li>`).join("")+`</ul></div>`).join(""); bump("sum"); }
 function addQA(q){
@@ -599,7 +609,8 @@ function connect(){
   es.onmessage = e=>{
     const m = JSON.parse(e.data);
     if(m.type==="state"){ const was=S.state; applyState(m); if(was!==m.state) loadBalance(true); if(was==="idle"&&m.state!=="idle"){ $("#trans").innerHTML=`<div class="empty" id="transEmpty">等老师开口…</div>`; } }
-    else if(m.type==="seg") addSeg(m);
+    else if(m.type==="seg"){ setDraft(""); addSeg(m); }
+    else if(m.type==="partial") setDraft(m.text, m.t);
     else if(m.type==="seg_zh") setZh(m.id, m.zh);
     else if(m.type==="summary") renderSummary(m.items);
     else if(m.type==="qa") addQA(m);

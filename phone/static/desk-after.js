@@ -2,6 +2,10 @@
 (function(){
   if(!window.TK) return;
   const $ = s => document.querySelector(s);
+  // 0) 平板宽度(约 1000–1300px)下按钮和模块标题别折成两行
+  const st = document.createElement("style");
+  st.textContent = "#ctrl .btn{white-space:nowrap;flex:none} .mod-h{white-space:nowrap} .mod-h small{overflow:hidden;text-overflow:ellipsis;min-width:0} @media (max-width:1366px){#ctxInfo{display:none}}";
+  document.head.appendChild(st);
   // 1) 网页版不需要「移交手机」:换台设备打开同一条链接就接上了
   const hb = $("#handBtn"); if(hb) hb.style.display = "none";
   // 2) 品牌旁标一下网页版

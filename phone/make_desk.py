@@ -12,7 +12,7 @@ DST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "desk.h
 s = open(SRC, encoding="utf-8").read()
 assert s.count("<script>") == 1 and s.count("</script>") == 1, "电脑版页面结构变了:应该只有一个内联主脚本"
 a = s.index("<script>"); b = s.index("</script>", a) + len("</script>")
-SHIM = '<script src="/live/static/desk-shim.js"></script>\n'
+SHIM = '<script src="/live/static/draft.js"></script>\n<script src="/live/static/desk-shim.js"></script>\n'
 AFTER = '\n<script src="/live/static/desk-after.js"></script>'
 s = s[:a] + SHIM + s[a:b] + AFTER + s[b:]
 s = re.sub(r"<title>.*?</title>", "<title>听课搭子 · 网页版</title>", s, count=1)
