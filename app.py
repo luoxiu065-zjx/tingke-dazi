@@ -225,12 +225,40 @@ def audio_capture(gen, device_id):
             status("声音输入中断(第 %d 次):%s。2 秒后自动重连…" % (fails, e), "error")
             time.sleep(2)
 
+PARTIAL_EVERY = float(os.getenv("PARTIAL_EVERY", "1.2"))      # 草稿多久刷新一次(秒);0 = 关掉草稿
+PARTIAL = {"req": None, "token": 0}       # req = (音频, 段起点, token);token 每切一段 +1,旧草稿作废
+partial_lock = threading.Lock()
+
+def _partial_request(buf, t0):
+    with partial_lock:
+        PARTIAL["req"] = (np.concatenate(buf).astype(np.float32), t0, PARTIAL["token"])
+
+def _partial_reset():
+    with partial_lock:
+        PARTIAL["req"] = None; PARTIAL["token"] += 1
+
+class _FileRecorder:
+    """测试用:把 16k 单声道 wav 当成声卡,按真实时间吐数据。"""
+    def __init__(self, path):
+        import wave
+        w = wave.open(path); assert w.getframerate() == SAMPLE_RATE and w.getnchannels() == 1 and w.getsampwidth() == 2
+        self.a = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16).astype(np.float32) / 32768; self.i = 0; self.t = time.time()
+    def __enter__(self): return self
+    def __exit__(self, *a): return False
+    def record(self, numframes):
+        if self.i >= len(self.a): self.i = 0
+        out = self.a[self.i:self.i + numframes]; self.i += numframes
+        if len(out) < numframes: out = np.concatenate([out, np.zeros(numframes - len(out), np.float32)])
+        self.t += numframes / SAMPLE_RATE; time.sleep(max(0, self.t - time.time()))
+        return out
+
 def _capture_once(gen, device_id):
-    dev = sc.get_microphone(device_id, include_loopback=True)
+    dbg = os.getenv("DEBUG_AUDIO_FILE", "")
+    dev = None if dbg else sc.get_microphone(device_id, include_loopback=True)
     buf = []; voiced = 0.0; silence = 0.0; seg_t0 = None; seg_clock = None
-    last_level = 0.0
+    last_level = 0.0; last_partial = 0.0
     if True:
-        with dev.recorder(samplerate=SAMPLE_RATE, channels=1, blocksize=SAMPLE_RATE // 2) as rec:   # 0.5s 缓冲,防识别占 CPU 时丢音
+        with (_FileRecorder(dbg) if dbg else dev.recorder(samplerate=SAMPLE_RATE, channels=1, blocksize=SAMPLE_RATE // 2)) as rec:   # 0.5s 缓冲,防识别占 CPU 时丢音
             while STATE["gen"] == gen and STATE["state"] == "recording":
                 data = rec.record(numframes=BLOCK)
                 mono = data[:, 0] if getattr(data, "ndim", 1) > 1 else data
@@ -254,6 +282,7 @@ def _capture_once(gen, device_id):
                 flush = (voiced >= MIN_SEG and silence >= SILENCE_HANG) or \
                         (total >= MAX_SEG and voiced >= MIN_SEG)
                 if flush:
+                    _partial_reset()
                     seg = np.concatenate(buf).astype(np.float32)
                     try:
                         audio_q.put_nowait((seg, seg_t0, seg_clock))
@@ -262,7 +291,12 @@ def _capture_once(gen, device_id):
                     buf = []; voiced = 0.0; silence = 0.0; seg_t0 = None
                 elif voiced == 0 and total > 2.0:
                     buf = buf[-5:]
+                elif PARTIAL_EVERY > 0 and seg_t0 is not None and voiced >= 0.5 and now - last_partial >= PARTIAL_EVERY:
+                    last_partial = now
+                    _partial_request(buf, seg_t0)
         # 暂停/结束时把手里没说完的半句也送去识别
+        _partial_reset()
+        publish({"type": "partial", "text": ""})
         if buf and voiced >= MIN_SEG:
             try:
                 audio_q.put_nowait((np.concatenate(buf).astype(np.float32), seg_t0 or 0.0, seg_clock))
@@ -310,10 +344,36 @@ def whisper_worker():
         except Exception as e:                     # 兜底:识别线程永远不退出
             status("识别出错,已跳过这一段:%s" % e, "error")
 
+def _recognize_partial(model):
+    """队列里没有要定稿的段时,做一次草稿识别(beam 1,不做 VAD),结果只推给页面,不进记录。"""
+    with partial_lock:
+        req = PARTIAL["req"]; PARTIAL["req"] = None
+    if req is None:
+        return False
+    audio, t0, token = req
+    try:
+        segments, _ = model.transcribe(audio, language="en", vad_filter=False, beam_size=1, best_of=1, without_timestamps=True,
+                                       initial_prompt=build_prompt(), condition_on_previous_text=False)
+        text = " ".join(x.text.strip() for x in segments if not (getattr(x, "compression_ratio", 0) or 0) > 2.4).strip()
+    except Exception:
+        return True
+    text = re.sub(r"[぀-ヿ㐀-鿿＀-￯]+", " ", text)
+    text = re.sub(r"\s{2,}", " ", text).strip()
+    with partial_lock:
+        stale = token != PARTIAL["token"]
+    if not stale and re.search(r"[A-Za-z]{2,}", text):
+        publish({"type": "partial", "text": text, "t": fmt_t(t0)})
+    return True
+
 def _recognize_one(model):
     global seg_counter
     if True:
-        seg, t0, clock = audio_q.get()
+        try:
+            seg, t0, clock = audio_q.get(timeout=0.05)
+        except queue.Empty:
+            if not _recognize_partial(model):
+                time.sleep(0.05)
+            return
         publish({"type": "recognizing", "on": True})
         try:
             # 精细解码(beam 5)+ 提示:本课术语 + 上一两句,让它认得专业词、接得上半句话
