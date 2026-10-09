@@ -1,0 +1,18 @@
+# COMP6231 Foundations of AI 术语
+Watson, Russell and Norvig, Turing test, Searle, Chinese Room, strong AI, weak AI,
+depth-first search, breadth-first search, iterative deepening, heuristic, A-star, admissible heuristic, branch and bound,
+production rules, non-monotonic logic, semantic network, description logic, first-order logic, inference,
+Bayesian network, belief propagation, conditional probability, Bayes' rule,
+supervised learning, unsupervised learning, reinforcement learning, ID3, decision tree, entropy, information gain
+
+# 课件自动补充 2026-10-09
+Backtracking, CSPs, Constraint, Forward, Idea, Keep, Terminate, Simplest, NSW, Example, Variable, Standard, CSP, Coloring, Binary, Boolean, Varieties, Note, States, Goal, COMP6031, Iterative
+
+# 课件自动补充 2026-10-09
+MAX, MIN, Game, Search, Minimax Example, Minimax, Evaluation Functions, Minimax Search, Game Tree, Chess, Evaluation, MAX-VALUE, EVAL, SUCCESSORS, MIN-VALUE, Minimax Algorithm, Consider
+
+# 课件自动补充 2026-10-09
+Alpha, Beta, Going Beyond Minimax, Noughts, Crosses, Associated, Never, Algorithm
+
+# 课件自动补充 2026-10-09
+Hill, Online, Local, Genetic, Agent, DFS, State, Problem, Start, Local Beam Search

@@ -1,0 +1,16 @@
+# COMP6246 Machine Learning Technologies 术语
+Bodala, Géron, scikit-learn, TensorFlow, PyTorch, NumPy,
+McCulloch-Pitts, Hebbian learning, perceptron, SVM, support vector machine, kernel, MLP, backpropagation,
+PCA, K-means, clustering, regression, logistic regression, gradient descent, loss function,
+overfitting, underfitting, regularization, cross-validation, bias-variance,
+precision, recall, F1 score, confusion matrix, ROC, AUC,
+CNN, convolutional neural network, RNN, LSTM, dropout, epoch, hyperparameter
+
+# 课件自动补充 2026-10-08
+Deep, Modularization, Classifier, Input, Network, Class, Neural Network, Fully Connect Feedforward, Softmax, Dogs, Cats, Image, Limitation, Classification, Output Layer, Multi, Neural, Desired Output, Feature Transformation, Hidden Layers, Input Layer, Output, VGG, Many, Example Application, Total Loss, Long, Basic, Reference, Logic, Using, Circuit
+
+# 课件自动补充 2026-10-08
+Function, Bagging, Tree, Bootstrapping, Randomly
+
+# 课件自动补充 2026-10-08
+Boosting, Training Data, Example, Adaboost, Rule, High, Random Forest, Different, Correct, Algorithm, Subtle

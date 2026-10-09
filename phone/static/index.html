@@ -1,0 +1,509 @@
+<!doctype html>
+<!-- 听课搭子 (tingke-dazi) · Copyright (c) 2026 luoxiu065-zjx · https://github.com/luoxiu065-zjx/tingke-dazi · build tkdz-1bf2795e -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#FFFDF8">
+<title>听课搭子 · 网页版</title>
+<style>
+:root{--paper:#FFFDF8;--sky:#EEF6FF;--card:#fff;--ink:#15233B;--ink2:#3F4D63;--ink3:#66738A;--line:#E7E2D6;--sun:#FFC83D;--sun-soft:#FFF1C7;--blue:#2F7BEA;--blue-soft:#E4EFFE;--red:#D93B3B;--ok:#16945C;--ok-soft:#E3F5EC;
+  --sans:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;--mono:ui-monospace,Menlo,Consolas,monospace}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+body{font:15px/1.55 var(--sans);color:var(--ink);background:linear-gradient(var(--paper),var(--sky) 80%);min-height:100%;padding-bottom:env(safe-area-inset-bottom)}
+header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;background:rgba(255,253,248,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.logo{width:30px;height:30px;border-radius:9px;background:var(--sun);display:grid;place-items:center;font-weight:800;box-shadow:inset 0 -2px 0 rgba(21,35,59,.12)}
+header b{font-size:16px}
+.chip{margin-left:auto;font-family:var(--mono);font-size:13px;color:var(--ink2);background:#fff;border:1px solid var(--line);border-radius:999px;padding:3px 10px;display:none}
+.gear{margin-left:auto;border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 12px;font:inherit;font-size:13px;color:var(--ink2);display:none}
+main{padding:16px;max-width:720px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 10px 30px -22px rgba(21,35,59,.35);margin-bottom:14px}
+h1{font-size:22px;margin:0 0 6px} h2{font-size:17px;margin:0 0 8px}
+.sub{color:var(--ink2);margin:0 0 16px;font-size:14px}
+.courses{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.course{border:1.5px solid var(--line);background:#fff;border-radius:12px;padding:12px;text-align:left;font:inherit;color:var(--ink)}
+.course b{display:block;font-family:var(--mono)} .course small{color:var(--ink3)}
+.course.on{border-color:var(--blue);background:var(--blue-soft)}
+.course.add{border-style:dashed;color:var(--blue);text-align:center}
+.btn{border:0;border-radius:12px;padding:14px 18px;font:inherit;font-weight:700;width:100%;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:transform .15s}
+.btn:active{transform:scale(.98)} .btn:disabled{opacity:.45}
+.btn-sun{background:var(--sun);color:var(--ink)} .btn-red{background:var(--red);color:#fff} .btn-ghost{background:#fff;border:1px solid var(--line);color:var(--ink)}
+.btn.sm{width:auto;padding:8px 12px;font-size:13px;border-radius:9px;display:inline-flex}
+.hint{font-size:13px;color:var(--ink3);margin-top:10px;text-align:center}
+.prev{margin:14px 0 0;border-top:1px dashed var(--line);padding-top:12px;font-size:13.5px;color:var(--ink2)}
+.prev summary{cursor:pointer;color:var(--ink);font-weight:600}
+.prev pre{white-space:pre-wrap;font:inherit;margin:8px 0 0}
+.scr{display:none} .scr.on{display:block}
+label.f{display:block;font-size:13px;color:var(--ink2);margin:12px 0 4px}
+input.f,select.f{width:100%;border:1.5px solid var(--line);border-radius:10px;padding:11px 12px;font:inherit;font-family:var(--mono);font-size:14px;background:#fff}
+input.f:focus{outline:0;border-color:var(--blue)}
+.row{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
+.ok{color:var(--ok)} .bad{color:var(--red)} .mut{color:var(--ink3);font-size:13px}
+details.how{margin-top:8px;font-size:13.5px;color:var(--ink2);background:var(--sun-soft);border-radius:10px;padding:8px 12px}
+details.how summary{cursor:pointer;font-weight:600;color:var(--ink)}
+details.how ol{margin:6px 0 0;padding-left:18px} details.how li{margin:3px 0}
+.steps{display:flex;gap:6px;margin:0 0 14px}
+.steps i{flex:1;height:5px;border-radius:3px;background:var(--line)} .steps i.on{background:var(--sun)}
+.opt{border:1.5px solid var(--line);border-radius:12px;padding:12px;margin-top:10px;cursor:pointer}
+.opt.on{border-color:var(--blue);background:var(--blue-soft)}
+.opt b{display:block} .opt small{color:var(--ink2)}
+.kv{display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px;align-items:center;font-size:14px;margin-top:10px}
+.kv code{font-family:var(--mono);background:#fff;border:1px solid var(--line);border-radius:6px;padding:4px 8px;word-break:break-all;font-size:13px}
+.kv button{border:1px solid var(--line);background:#fff;border-radius:6px;padding:4px 8px;font:inherit;font-size:12px}
+.linkbar{background:var(--ok-soft);border:1px solid #BFE6D1;border-radius:12px;padding:10px 12px;font-size:13.5px;margin-bottom:14px}
+.linkbar code{display:block;font-family:var(--mono);font-size:12px;word-break:break-all;margin:6px 0}
+.trial{display:inline-block;background:var(--sun-soft);border-radius:999px;padding:3px 10px;font-size:12.5px;color:var(--ink2)}
+#live{display:none}
+.bar{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.timer{font-family:var(--mono);font-size:26px;font-weight:700;letter-spacing:1px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--red);animation:blink 1.2s infinite} @keyframes blink{50%{opacity:.25}}
+.paused .dot{animation:none;background:var(--ink3)}
+.level{flex:1;height:8px;border-radius:4px;background:#eee;overflow:hidden} .level i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--blue),var(--sun));transition:width .1s}
+.tabs{display:flex;gap:6px;margin-bottom:4px}
+.stick{position:sticky;top:var(--hdr,58px);z-index:4;background:var(--card);margin:-18px -18px 8px;padding:14px 18px 8px;border-radius:16px 16px 0 0;box-shadow:0 8px 12px -12px rgba(21,35,59,.35)}
+body.wide .stick{position:static;margin:0;padding:0;box-shadow:none;background:none}
+.tab{flex:1;border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px;font:inherit;color:var(--ink2)} .tab.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.tab small{opacity:.7;margin-left:4px}
+.pane{display:none} .pane.on{display:block}
+/* 宽屏(Mac / iPad 横屏 / 笔记本浏览器):照搬电脑版的壳 —— 左侧栏 + 课程标题 + 2×2 模块卡;窄屏还是一个个切 */
+.shell{display:block}
+.lside,.lcrumb,.lhead,.mod-h{display:none}
+#gridwrap{display:block}
+.mod{display:contents}
+body.wide{background:var(--sky)}
+body.wide main{max-width:none;padding:0}
+body.wide header{display:none}
+body.wide .shell{display:flex;gap:0;height:100vh;align-items:stretch}
+body.wide .lside{display:flex;flex-direction:column;width:216px;flex:none;padding:18px 16px;background:var(--paper);border-right:1px solid var(--line)}
+body.wide .lbrand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;margin:0 2px 20px}
+body.wide .lside-t{font-size:12px;letter-spacing:.08em;color:var(--ink3);margin-bottom:6px}
+body.wide .lside-c{font-size:15px;font-weight:600;line-height:1.4}
+body.wide .lside-s{font-size:12.5px;color:var(--ink3);line-height:1.5}
+body.wide .lside-foot{margin-top:auto}
+body.wide .lmain{flex:1;min-width:0;display:flex;flex-direction:column;padding:16px 22px 14px;gap:0}
+body.wide .lcrumb{display:block;font-size:13px;color:var(--ink3);margin-bottom:2px}
+body.wide .lcrumb span{color:var(--ink3);opacity:.7}
+body.wide .lhead{display:block;margin:0 0 12px}
+body.wide .lhead h1{font-size:26px;margin:0}
+body.wide #live .card{flex:1;min-height:0;display:flex;flex-direction:column;margin-bottom:10px}
+body.wide .tabs{display:none}
+body.wide #gridwrap{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);grid-template-rows:1fr 1fr;gap:14px;margin-top:12px}
+body.wide .mod{display:flex;flex-direction:column;min-height:0;border:1px solid var(--line);border-radius:14px;padding:12px 14px 8px;background:#fff}
+body.wide #modTrans{grid-row:1 / span 2}
+body.wide .mod-h{display:flex;align-items:center;gap:8px;font-size:15.5px;font-weight:700;margin-bottom:8px}
+body.wide .mod-h .ic{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;font-size:13px;background:var(--sun-soft);color:#9A6700;flex:none}
+body.wide .mod-h small{font-weight:400;color:var(--ink3);font-size:12px;margin-left:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+body.wide .pane{display:block;flex:1;min-height:0;overflow:auto;padding-right:4px}
+body.wide #live .card{position:relative}
+body.wide .foot{position:absolute;top:12px;right:16px;width:auto;background:none;padding:0;z-index:3}
+body.wide .foot .row{gap:8px}
+body.wide .foot .btn{width:auto;padding:9px 16px;font-size:14px;border-radius:10px}
+body.wide .bar{padding-right:300px}
+.viewbtn{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 12px;font:inherit;font-size:13px;color:var(--ink2);margin-left:8px;display:none}
+.seg{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.seg .ts{font-family:var(--mono);font-size:11px;color:var(--ink3);min-width:52px;padding-top:3px}
+.seg .en{color:var(--ink)} .seg .zh{color:var(--ink2);font-size:14px;margin-top:3px}
+.seg.draft .en{color:var(--ink3);font-style:italic} .seg.draft .ts{opacity:.5}
+.seg.latest .en{background:var(--sun-soft);border-radius:6px;padding:0 4px}
+.sum-sec{margin-bottom:12px} .sum-sec .topic{font-weight:700;margin-bottom:4px} .sum-sec ul{margin:0;padding-left:18px} .sum-sec li{margin:2px 0;font-size:14px}
+.qa{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px;background:#fff}
+.qa .q{font-weight:700} .qa .qen{font-size:13px;color:var(--ink3);margin:4px 0 8px}
+.qa .azh{font-size:14px} .qa .aen{display:flex;gap:8px;align-items:flex-start;background:var(--blue-soft);border-radius:8px;padding:8px;margin-top:8px;font-size:14px}
+.qa .aen button{margin-left:auto;border:0;background:var(--blue);color:#fff;border-radius:6px;padding:4px 8px;font:inherit;font-size:12px;white-space:nowrap}
+.empty{color:var(--ink3);text-align:center;padding:30px 0;font-size:14px}
+.foot{position:sticky;bottom:0;padding:10px 0 calc(10px + env(safe-area-inset-bottom));background:linear-gradient(transparent,var(--sky) 40%)}
+.foot .row{display:flex;gap:10px;margin:0}
+.rec-item{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px dashed var(--line);font-size:13.5px} .rec-item a{color:var(--blue)}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(92px + env(safe-area-inset-bottom));max-width:92%;background:var(--ink);color:#fff;border-radius:10px;padding:10px 14px;font-size:13.5px;display:none;z-index:9}
+#toast.error{background:var(--red)} #toast.ok{background:var(--ok)}
+#toast a{color:#fff;text-decoration:underline;margin-left:8px}
+</style>
+</head>
+<body>
+<header><div class="logo">搭</div><b>听课搭子</b><span style="color:var(--ink3);font-size:13px">网页版</span><span class="chip" id="chip"></span><button class="viewbtn" id="viewBtn">⊞ 宽屏</button><button class="gear" id="gearBtn">⚙ 设置</button></header>
+<main>
+
+<!-- 0 欢迎(没有钥匙) -->
+<section class="scr" id="welcome">
+  <div class="card">
+    <h1>英文课,打开网页就能听懂</h1>
+    <p class="sub">手机录老师的声音,英文一句句出来、下面跟中文,AI 按主题整理要点,老师提问时给你一句能说出口的英文。下课自动存成笔记,同步到你的 Obsidian。手机、平板、Mac、电脑浏览器都行,不用装任何东西。</p>
+    <button class="btn btn-sun" id="regBtn">开始使用(免费)</button>
+    <div class="hint">要用你自己的两个 key:Groq 免费,DeepSeek 充几块钱(一小时课 3–5 毛)。下一步有两段 1 分钟以内的录屏,跟着点就行。</div>
+    <div class="hint">请用 Safari 或 Chrome 打开(手机上微信、QQ 里打开录不了音)</div>
+    <details class="prev"><summary>我已经有专属链接</summary>
+      <label class="f">把链接或钥匙粘到这里</label>
+      <div class="row"><input class="f" id="keyIn" placeholder="https://…/live/?k=… 或 钥匙本身" style="flex:1"><button class="btn btn-ghost sm" id="keyGo">进入</button></div>
+    </details>
+  </div>
+</section>
+
+<!-- 1 向导 / 设置 -->
+<section class="scr" id="wizard">
+  <div class="linkbar" id="linkbar" style="display:none">✅ 账号开好了。<b>这是你的专属链接,只有它能打开你的账号,请收藏或「添加到主屏幕」</b>:<code id="myLink"></code><button class="btn btn-ghost sm" id="copyLink">复制链接</button></div>
+  <div class="steps" id="steps"><i class="on"></i><i></i><i></i></div>
+
+  <div class="card" id="w1">
+    <h2>1 · 两把 key <span class="trial" id="trialTag"></span></h2>
+    <p class="sub" id="w1Sub">跟着下面两段录屏点,两分钟拿到两个 key。粘进框里会自动检查,两个都显示「能用」就能下一步。key 只存在你自己的账号里。</p>
+    <label class="f">Groq key(语音识别,免费)</label>
+    <div class="row"><input class="f" id="gk" placeholder="gsk_…" autocomplete="off" style="flex:1"><button class="btn btn-ghost sm" id="gkTest">测试</button></div>
+    <div class="mut" id="gkMsg"></div>
+    <details class="how" id="howG"><summary>怎么拿 Groq key(看 38 秒录屏)</summary><video src="/live/static/guide/groq-key.mp4" controls playsinline preload="metadata" style="width:100%;border-radius:10px;margin:8px 0"></video><ol>
+      <li>打开 <a href="https://console.groq.com" target="_blank">console.groq.com</a>,用 Google / GitHub / 邮箱注册。</li>
+      <li>左侧菜单 <b>API Keys</b> → <b>Create API Key</b>,名字随便起。</li>
+      <li>复制出来粘到上面(只显示一次,丢了就再建一个)。</li>
+      <li>免费档每天 8 小时音频,一个人上课够用。</li></ol></details>
+    <label class="f">DeepSeek key(翻译 / 总结 / 提问)</label>
+    <div class="row"><input class="f" id="dk" placeholder="sk-…" autocomplete="off" style="flex:1"><button class="btn btn-ghost sm" id="dkTest">测试</button></div>
+    <div class="mut" id="dkMsg"></div>
+    <details class="how" id="howD"><summary>怎么拿 DeepSeek key(看 16 秒录屏)</summary><video src="/live/static/guide/deepseek-key.mp4" controls playsinline preload="metadata" style="width:100%;border-radius:10px;margin:8px 0"></video><ol>
+      <li>打开 <a href="https://platform.deepseek.com" target="_blank">platform.deepseek.com</a>,手机号注册。</li>
+      <li>左侧 <b>充值</b>,充几块钱就够用很久(一小时课约 3–5 毛)。不充值 key 会报「余额不足」。</li>
+      <li>左侧 <b>API keys</b> → <b>创建 API key</b> → 复制粘到上面。</li></ol></details>
+    <div class="row" style="margin-top:16px"><button class="btn btn-ghost" id="w1Skip" style="flex:1">先试用,跳过</button><button class="btn btn-sun" id="w1Next" style="flex:1">保存,下一步</button></div>
+  </div>
+
+  <div class="card" id="w2" style="display:none">
+    <h2>2 · 笔记同步到哪</h2>
+    <p class="sub">下课后的笔记是一个 Markdown 文件。选一种方式让它出现在你的 Obsidian 里。</p>
+    <div class="opt on" data-m="hosted"><b>用这里给你的同步文件夹(推荐,最省事)</b><small>服务器给你开一个私人 WebDAV 文件夹,手机和电脑的 Obsidian 装 Remotely Save 指过来就行。笔记会存在这台服务器上,只有你能访问。</small></div>
+    <div class="opt" data-m="webdav"><b>用我自己的 WebDAV(坚果云 / 自建)</b><small>下课后把笔记推到你的网盘,不经过这里存储。</small></div>
+    <div class="opt" data-m="none"><b>不同步,结束后手动下载</b><small>每节课结束页有下载按钮,7 天内都能下。</small></div>
+
+    <div id="hostedBox" style="margin-top:12px">
+      <div class="kv" id="hostedKv"></div>
+      <details class="how" open><summary>手机 Obsidian 里怎么配(5 步,只配一次)</summary><ol>
+        <li>Obsidian → 设置 → <b>第三方插件</b> → 关闭安全模式 → 浏览,搜 <b>Remotely Save</b>,安装并启用。</li>
+        <li>进 Remotely Save 的设置:服务选 <b>WebDAV</b>。</li>
+        <li>地址、用户名、密码照上面三行粘进去;<b>远程基础目录</b> 填 <code>tingke</code>。</li>
+        <li>点「检查连接」,显示成功。</li>
+        <li>回到笔记,点左侧栏的同步按钮。电脑上的 Obsidian 装同一个插件、填同样的内容,两边就同步了。</li></ol></details>
+    </div>
+    <div id="webdavBox" style="display:none;margin-top:12px">
+      <label class="f">WebDAV 地址</label><input class="f" id="wUrl" placeholder="https://dav.jianguoyun.com/dav">
+      <label class="f">账号</label><input class="f" id="wUser" placeholder="邮箱或用户名">
+      <label class="f">密码(坚果云是「第三方应用密码」)</label><input class="f" id="wPass" type="password" placeholder="留空=不改">
+      <label class="f">放在网盘哪个文件夹</label><input class="f" id="wBase" value="tingke">
+      <div class="row"><button class="btn btn-ghost sm" id="wTest">测试连接</button><span class="mut" id="wMsg"></span></div>
+      <details class="how"><summary>坚果云怎么拿 WebDAV 密码</summary><ol><li>网页登录坚果云 → 右上角头像 → 账户信息 → <b>安全选项</b>。</li><li><b>第三方应用管理</b> → 添加应用 → 生成密码,复制。</li><li>地址填 https://dav.jianguoyun.com/dav ,账号是你的邮箱。</li><li>手机 Obsidian 的 Remotely Save 也填同一套,远程基础目录填 tingke。</li></ol></details>
+    </div>
+    <div class="row" style="margin-top:16px"><button class="btn btn-ghost" id="w2Back" style="flex:1">上一步</button><button class="btn btn-sun" id="w2Next" style="flex:1">保存,下一步</button></div>
+  </div>
+
+  <div class="card" id="w3" style="display:none">
+    <h2>3 · 发一份测试笔记</h2>
+    <p class="sub">点一下,服务器会往你的同步位置放一页「测试笔记」。在手机 Obsidian 里同步一次,看到它就说明整条链通了。</p>
+    <button class="btn btn-ghost" id="testNote">发测试笔记</button>
+    <div class="mut" id="testMsg" style="margin-top:8px"></div>
+    <label class="f" style="margin-top:16px">我的课程(课号 名称,一行一门)</label>
+    <textarea class="f" id="coursesIn" rows="4" style="width:100%;border:1.5px solid var(--line);border-radius:10px;padding:10px;font:inherit;font-size:14px"></textarea>
+    <div class="row" style="margin-top:16px"><button class="btn btn-ghost" id="w3Back" style="flex:1">上一步</button><button class="btn btn-sun" id="w3Done" style="flex:1">完成,去上课</button></div>
+    <div id="recBox" style="display:none;margin-top:16px"><h2>我的记录(7 天内)</h2><div id="recList"></div></div>
+  </div>
+</section>
+
+<!-- 2 选课 -->
+<section class="scr card" id="setup">
+  <h1>这是哪门课?</h1>
+  <p class="sub">录老师的声音,转写和翻译在服务器上做,下课自动存成笔记。手机录音时别锁屏。</p>
+  <div class="courses" id="courses"></div>
+  <button class="btn btn-sun" id="startBtn" disabled>🎙 开始录制</button>
+  <div class="hint" id="hint">先选课程</div>
+  <label class="qa-sw" style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:14px;color:var(--ink2)"><input type="checkbox" id="qaOnM" style="width:18px;height:18px">老师提问时自动给中英文参考回答 <small style="color:var(--ink3)">(会多用一点 DeepSeek)</small></label>
+  <details class="prev" id="prev" style="display:none"><summary>上节课讲到哪</summary><pre id="prevText"></pre></details>
+</section>
+
+<!-- 3 录制 -->
+<section id="live">
+  <div class="shell">
+    <aside class="lside">
+      <div class="lbrand"><div class="logo">搭</div>听课搭子</div>
+      <div class="lside-t">本节课</div>
+      <div class="lside-c" id="sideCourse">—</div>
+      <div class="lside-t" style="margin-top:18px">记录去哪</div>
+      <div class="lside-s" id="sideWhere">下课自动存成笔记</div>
+      <div class="lside-foot"><button class="viewbtn" id="viewBtn2">▤ 手机视图</button></div>
+    </aside>
+    <div class="lmain">
+      <div class="lcrumb">实时记录 <span id="lcrumbSub">· 录制中</span></div>
+      <div class="lhead"><h1 id="liveTitle">正在上课</h1></div>
+      <div class="card">
+        <div class="stick" id="stick">
+        <div class="bar" id="bar"><span class="dot"></span><span class="timer" id="timer">00:00:00</span><div class="level"><i id="lv"></i></div></div>
+        <div class="tabs">
+          <button class="tab on" data-p="trans">转写<small id="nTrans"></small></button>
+          <button class="tab" data-p="sum">总结</button>
+          <button class="tab" data-p="qa">提问<small id="nQa"></small></button>
+        </div>
+        </div>
+        <div id="gridwrap">
+          <div class="mod" id="modTrans"><div class="mod-h"><span class="ic">✎</span>转写<small>英文原文 · 灰字为中文</small></div>
+            <div class="pane on" id="trans"><div class="empty" id="transEmpty">等老师开口…</div></div></div>
+          <div class="mod" id="modSum"><div class="mod-h"><span class="ic">✦</span>AI 总结<small>整节课 · 约每 40 秒更新</small></div>
+            <div class="pane" id="sum"><div class="empty">讲过一段内容后,这里会按主题出现笔记。</div></div></div>
+          <div class="mod" id="modQa"><div class="mod-h"><span class="ic">🎯</span>老师提问<small>老师一提问,自动给中英文参考回答</small></div>
+            <div class="pane" id="qa"><div class="empty" id="qaEmpty">还没有人提问。</div></div></div>
+        </div>
+      </div>
+      <div class="foot"><div class="row">
+        <button class="btn btn-ghost" id="pauseBtn">❚❚ 暂停</button>
+        <button class="btn btn-red" id="stopBtn">⏺ 结束并保存</button>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 4 保存完成 -->
+<section class="scr card" id="done">
+  <h1>这节课存好了</h1>
+  <p class="sub" id="doneWhere"></p>
+  <div class="row"><a class="btn btn-ghost" id="dlBtn" style="display:none;text-decoration:none">⬇ 下载 .md</a></div>
+  <button class="btn btn-sun" id="doneBack" style="margin-top:12px">回到选课</button>
+</section>
+</main>
+<div id="toast"></div>
+
+<script src="/live/static/draft.js"></script>
+<script>
+const $=s=>document.querySelector(s);
+const u=new URL(location.href); let K=u.searchParams.get("k")||localStorage.getItem("k")||"";
+if(K){ localStorage.setItem("k",K); if(u.searchParams.get("k")){ history.replaceState(null,"",location.pathname); } }
+const api=(p)=>"/live/"+p+(p.includes("?")?"&":"?")+"k="+encodeURIComponent(K);
+const myLink=()=>location.origin+location.pathname+"?k="+encodeURIComponent(K);
+let ME=null, courses=[], chosen=null, sid=null, es=null, seq=0, recording=false, paused=false, tick=null, elapsedBase=0, startedAt=0;
+let stream=null, actx=null, srcNode=null, proc=null, sink=null, mime="audio/wav", inRate=48000, wake=null, fromSettings=false, noSoundWarned=false, peak=0, gotAudio=false, pcm=[], pcmLen=0, rawMax=0, segT0=0, segVoiced=0, segSilence=0, segMax=0, pending=Promise.resolve();
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function toast(msg,level="",link=null){const t=$("#toast");t.className=level;t.innerHTML=esc(msg)+(link?`<a href="${esc(link)}">打开</a>`:"");t.style.display="block";clearTimeout(t._h);if(level!=="error")t._h=setTimeout(()=>t.style.display="none",link?12000:5000);}
+async function post(p,body){const r=await fetch(api(p),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})});const j=await r.json().catch(()=>({}));if(!r.ok)toast(j.msg||("出错 "+r.status),"error");return j;}
+function fmt(s){s=Math.max(0,Math.floor(s));const p=n=>String(n).padStart(2,"0");return p(s/3600|0)+":"+p(s%3600/60|0)+":"+p(s%60);}
+/* 视图:宽屏三块并排 / 窄屏一个个切。默认按屏幕宽度,点按钮可手动切,记住选择 */
+function applyView(){
+  document.body.classList.remove("wide");
+  const b=$("#viewBtn"); if(b){ b.textContent="🖥 电脑布局"; b.style.display = K ? "inline-block" : "none"; }
+  const b2=$("#viewBtn2"); if(b2) b2.style.display="none";
+}
+async function goDesk(){
+  try{ localStorage.setItem("view","desk"); }catch(e){}
+  if(recording && !paused){ try{ await stopMic(); await post("pause",{sid}); }catch(e){} }   // 先把这一句传完、暂停,电脑布局里点「继续」接着录
+  location.href="/live/desk";
+}
+function wantDesk(){ let v=null; try{ v=localStorage.getItem("view"); }catch(e){} return v==="desk" || (v!=="phone" && innerWidth>=900); }
+addEventListener("resize", applyView);
+function show(id){document.querySelectorAll(".scr").forEach(x=>x.classList.toggle("on",x.id===id)); $("#live").style.display=id==="live"?"block":"none"; $("#gearBtn").style.display=(id==="setup")?"inline-block":"none"; window.scrollTo(0,0); applyView();}
+async function copy(t,btn){try{await navigator.clipboard.writeText(t);if(btn){const o=btn.textContent;btn.textContent="已复制";setTimeout(()=>btn.textContent=o,1500);}}catch(e){prompt("长按复制",t);}}
+
+/* ---------- 欢迎 / 注册 ---------- */
+$("#regBtn").onclick=async()=>{ $("#regBtn").disabled=true; const r=await fetch("/live/register",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}); const j=await r.json().catch(()=>({})); $("#regBtn").disabled=false;
+  if(!j.ok){toast(j.msg||"注册失败","error");return;} K=j.k; localStorage.setItem("k",K); $("#linkbar").style.display="block"; $("#myLink").textContent=myLink(); await loadConfig(true); };
+$("#keyGo").onclick=()=>{ let v=$("#keyIn").value.trim(); try{ const uu=new URL(v); v=uu.searchParams.get("k")||v; }catch(e){} if(!v)return; K=v; localStorage.setItem("k",K); loadConfig(); };
+$("#copyLink").onclick=e=>copy(myLink(),e.target);
+
+/* ---------- 配置 ---------- */
+async function loadConfig(freshUser=false){
+  if(!K){ show("welcome"); return; }
+  const r=await fetch(api("config")); if(r.status===401){ localStorage.removeItem("k"); K=""; toast("这把钥匙不对,重新开始或粘贴你的链接","error"); show("welcome"); return; }
+  const c=await r.json(); ME=c.me; courses=c.courses;
+  $("#courses").innerHTML=courses.map((x,i)=>{const [code,...rest]=x.split(" ");return `<button class="course" data-i="${i}"><b>${esc(code)}</b><small>${esc(rest.join(" "))}</small></button>`}).join("")+`<button class="course add" id="addCourse">＋ 添加课程</button>`;
+  document.querySelectorAll(".course:not(.add)").forEach(b=>b.onclick=()=>{document.querySelectorAll(".course").forEach(x=>x.classList.remove("on"));b.classList.add("on");chosen=courses[+b.dataset.i];$("#startBtn").disabled=false;$("#hint").textContent="将录制:"+chosen;loadPrev();});
+  $("#addCourse").onclick=async()=>{ const v=prompt("课号 名称,例如:COMP6246 机器学习"); if(!v||!v.trim())return; await post("settings",{courses:[...courses,v.trim()]}); loadConfig(); };
+  fillWizard();
+  const wantSettings=new URL(location.href).searchParams.get("settings")==="1";
+  if(wantSettings){ history.replaceState(null,"",location.pathname); }
+  else if(!freshUser && wantDesk() && (ME.owner || ME.groq_key_tail || localStorage.getItem("wizard_done"))){ location.replace("/live/desk"); return; }
+  if(c.active){ sid=c.active.sid; chosen=c.active.course; elapsedBase=c.active.elapsed||0; enterLive(); toast("接上了正在录的这节课,点「继续」接着录"); setPaused(true,false); return; }
+  $("#qaOnM").checked=!!ME.auto_qa;
+  if(wantSettings || freshUser || (!ME.owner && !ME.groq_key_tail && !localStorage.getItem("wizard_done"))){ gotoStep(1); show("wizard"); } else show("setup");
+}
+async function loadPrev(){ const r=await fetch(api("prev?course="+encodeURIComponent(chosen))); const j=await r.json().catch(()=>({})); if(j.text){$("#prev").style.display="block";$("#prevText").textContent=j.text;} else $("#prev").style.display="none"; }
+
+/* ---------- 向导 / 设置 ---------- */
+let syncMode="hosted";
+function fillWizard(){
+  const trialOn=(ME.trial_total||0)>0;
+  $("#trialTag").textContent=(ME.owner||!trialOn)?"":(ME.trial_left>0?`试用额度还剩 ${Math.round(ME.trial_left/60)} 分钟`:"试用额度已用完");
+  $("#howG").open=!ME.groq_key_tail; $("#howD").open=!ME.ds_key_tail;
+  const hasKeys=ME.owner||(ME.groq_key_tail&&ME.ds_key_tail);
+  $("#w1Skip").style.display=(hasKeys||trialOn)?"":"none"; $("#w1Skip").textContent=hasKeys?"不改,下一步":"先试用,跳过";
+  $("#gk").placeholder=ME.groq_key_tail?"已填(尾号 "+ME.groq_key_tail+"),留空=不改":"gsk_…";
+  $("#dk").placeholder=ME.ds_key_tail?"已填(尾号 "+ME.ds_key_tail+"),留空=不改":"sk-…";
+  syncMode=ME.sync.mode==="owner"?"hosted":ME.sync.mode; setMode(syncMode);
+  if(ME.sync.hosted){ const h=ME.sync.hosted; $("#hostedKv").innerHTML=[["地址",h.url],["用户名",h.user],["密码",h.pass],["远程基础目录",h.base]].map(([k,v])=>`<span>${k}</span><code>${esc(v)}</code><button data-c="${esc(v)}">复制</button>`).join(""); $("#hostedKv").querySelectorAll("button").forEach(b=>b.onclick=()=>copy(b.dataset.c,b)); }
+  if(ME.sync.webdav){ $("#wUrl").value=ME.sync.webdav.url||""; $("#wUser").value=ME.sync.webdav.user||""; $("#wBase").value=ME.sync.webdav.base||"tingke"; }
+  $("#coursesIn").value=courses.join("\n");
+  $("#recBox").style.display=ME.owner?"none":"block";
+}
+function setMode(m){ syncMode=m; document.querySelectorAll(".opt").forEach(o=>o.classList.toggle("on",o.dataset.m===m)); $("#hostedBox").style.display=m==="hosted"?"block":"none"; $("#webdavBox").style.display=m==="webdav"?"block":"none"; }
+document.querySelectorAll(".opt").forEach(o=>o.onclick=()=>setMode(o.dataset.m));
+function gotoStep(n){ ["w1","w2","w3"].forEach((id,i)=>$("#"+id).style.display=i===n-1?"block":"none"); document.querySelectorAll("#steps i").forEach((x,i)=>x.classList.toggle("on",i<n)); window.scrollTo(0,0); if(n===3&&!ME.owner) loadRecords(); }
+async function saveKeys(){ const body={}; if($("#gk").value.trim())body.groq_key=$("#gk").value.trim(); if($("#dk").value.trim())body.ds_key=$("#dk").value.trim(); if(Object.keys(body).length){ const j=await post("settings",body); if(j.ok){ME=j.me; $("#gk").value=""; $("#dk").value=""; fillWizard();} } }
+$("#gkTest").onclick=async()=>{ $("#gkMsg").textContent="测试中…"; const j=await post("keys/test",{which:"groq",groq_key:$("#gk").value.trim()}); const [ok,m]=j.result?.groq||[false,"?"]; $("#gkMsg").innerHTML=`<span class="${ok?"ok":"bad"}">${esc(m)}</span>`; };
+$("#dkTest").onclick=async()=>{ $("#dkMsg").textContent="测试中…"; const j=await post("keys/test",{which:"ds",ds_key:$("#dk").value.trim()}); const [ok,m]=j.result?.ds||[false,"?"]; $("#dkMsg").innerHTML=`<span class="${ok?"ok":"bad"}">${esc(m)}</span>`; };
+$("#w1Skip").onclick=()=>gotoStep(2);
+// 粘进去就自动检查,不用自己点「测试」
+let kt={};
+["gk","dk"].forEach(id=>$("#"+id).addEventListener("input",()=>{ clearTimeout(kt[id]); const v=$("#"+id).value.trim(); if(v.length<20) return; kt[id]=setTimeout(()=>$("#"+(id==="gk"?"gkTest":"dkTest")).click(),500); }));
+$("#w1Next").onclick=async()=>{
+  const trialOn=(ME.trial_total||0)>0;
+  if(!ME.owner&&!trialOn){
+    const need=[]; if(!ME.groq_key_tail&&!$("#gk").value.trim()) need.push("Groq key"); if(!ME.ds_key_tail&&!$("#dk").value.trim()) need.push("DeepSeek key");
+    if(need.length){ toast("还差 "+need.join(" 和 ")+":跟着上面的录屏拿一个,粘进框里","error"); return; }
+    const bad=[]; for(const [id,btn,msg] of [["gk","gkTest","gkMsg"],["dk","dkTest","dkMsg"]]){ if($("#"+id).value.trim()){ await $("#"+btn).onclick(); if(!$("#"+msg).querySelector(".ok")) bad.push(id==="gk"?"Groq":"DeepSeek"); } }
+    if(bad.length){ toast(bad.join("、")+" 的 key 没通过检查:看框下面的提示,多半是复制少了字或 DeepSeek 没充值","error"); return; }
+  }
+  await saveKeys(); gotoStep(2); };
+$("#w2Back").onclick=()=>gotoStep(1);
+$("#wTest").onclick=async()=>{ $("#wMsg").textContent="测试中…"; const j=await post("sync/test",{webdav:{url:$("#wUrl").value,user:$("#wUser").value,pass:$("#wPass").value,base:$("#wBase").value}}); $("#wMsg").innerHTML=`<span class="${j.ok?"ok":"bad"}">${esc(j.msg)}</span>`; };
+$("#w2Next").onclick=async()=>{ const sync={mode:syncMode}; if(syncMode==="webdav") sync.webdav={url:$("#wUrl").value,user:$("#wUser").value,pass:$("#wPass").value,base:$("#wBase").value}; const j=await post("settings",{sync}); if(j.ok){ME=j.me; fillWizard(); gotoStep(3);} };
+$("#w3Back").onclick=()=>gotoStep(2);
+$("#testNote").onclick=async()=>{ $("#testMsg").textContent="发送中…"; const j=await post("sync/testnote",{}); $("#testMsg").innerHTML=`<span class="${j.ok?"ok":"bad"}">${esc(j.msg)}</span>`; };
+$("#w3Done").onclick=async()=>{ const cs=$("#coursesIn").value.split("\n").map(x=>x.trim()).filter(Boolean); await post("settings",{courses:cs.length?cs:["其他"]}); localStorage.setItem("wizard_done","1"); $("#linkbar").style.display="none"; await loadConfig(); show("setup"); };
+$("#qaOnM").onchange=()=>post("settings",{auto_qa:$("#qaOnM").checked});
+$("#gearBtn").onclick=()=>{ fillWizard(); gotoStep(1); show("wizard"); };
+$("#viewBtn").onclick=goDesk; $("#viewBtn2").onclick=goDesk;
+async function loadRecords(){ const r=await fetch(api("records")); const j=await r.json().catch(()=>({items:[]})); $("#recList").innerHTML=(j.items||[]).length?j.items.map(it=>`<div class="rec-item"><span>${esc(it.name)}</span><a href="${api("record?f="+encodeURIComponent(it.rel))}">下载</a></div>`).join(""):`<div class="mut">还没有记录</div>`; }
+
+/* ---------- 录音:按停顿切段,每段单独一个文件传给服务器 ---------- */
+async function startMic(){
+  // 先在点击的同一刻建好并唤醒 AudioContext(iPhone 只认用户点击里发起的 resume),再要麦克风
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if(!AC || !navigator.mediaDevices) throw new Error("这个浏览器不支持录音,请用 Safari / Chrome / Edge 打开(别在微信里打开)");
+  actx = new AC(); try{ actx.resume(); }catch(e){}
+  stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:true,autoGainControl:true}});
+  try{ await actx.resume(); }catch(e){}
+  buildGraph(); newSeg(); gotAudio = false; noSoundWarned = false; peak = 0; rawMax = 0;
+  setTimeout(async () => {
+    if(!recording || paused || !stream) return;
+    if(!gotAudio || rawMax === 0){                       // 没回调,或者回调里全是 0(个别 iPhone 会这样):换个新的音频环境再接一次
+      try{ proc.onaudioprocess = null; srcNode.disconnect(); proc.disconnect(); sink.disconnect(); actx.close(); }catch(e){}
+      const AC2 = window.AudioContext || window.webkitAudioContext; actx = new AC2(); try{ await actx.resume(); }catch(e){}
+      buildGraph(); newSeg();
+      setTimeout(() => { if(recording && !paused && (!gotAudio || rawMax === 0)) toast("麦克风没有声音数据:请确认浏览器允许了麦克风;手机上别用微信 / QQ 里打开,用 Safari 或 Chrome", "error"); }, 3000);
+    }
+  }, 3000);
+  try{ wake = await navigator.wakeLock?.request("screen"); }catch(e){}
+  if(window.TKDraft) TKDraft.start(t => setDraft(t));
+}
+function buildGraph(){
+  inRate = actx.sampleRate;
+  srcNode = actx.createMediaStreamSource(stream);
+  proc = actx.createScriptProcessor(4096, 1, 1);
+  sink = actx.createGain(); sink.gain.value = 0;          // 必须接到输出才会持续回调;音量 0,不会从喇叭放出来
+  srcNode.connect(proc); proc.connect(sink); sink.connect(actx.destination);
+  proc.onaudioprocess = e => { gotAudio = true; if(!recording || paused) return; onAudio(new Float32Array(e.inputBuffer.getChannelData(0))); };
+}
+const VTHR = 0.006, MAXSEG = 15;
+function newSeg(){ pcm = []; pcmLen = 0; segVoiced = 0; segSilence = 0; segMax = 0; segT0 = elapsedNow(); }
+function onAudio(x){
+  let s2 = 0; for(let i = 0; i < x.length; i++) s2 += x[i] * x[i];
+  const rms = Math.sqrt(s2 / x.length), dt = x.length / inRate;
+  peak = Math.max(peak * 0.98, rms); $("#lv").style.width = Math.min(100, Math.sqrt(rms) * 320) + "%";
+  if(!pcmLen) segT0 = elapsedNow();
+  if(rms > rawMax) rawMax = rms;
+  pcm.push(x); pcmLen += x.length; segMax = Math.max(segMax, rms);
+  if(rms >= VTHR){ segVoiced += dt; segSilence = 0; } else segSilence += dt;
+  const len = pcmLen / inRate;
+  if((segVoiced >= 0.6 && segSilence >= 1.0 && len >= 2) || len >= MAXSEG) flushSeg();
+  if(!noSoundWarned && elapsedNow() > 14 && peak < 0.0015){ noSoundWarned = true; toast("几乎没听到声音:离声源近一点,或检查麦克风权限", "error"); }
+}
+function flushSeg(){
+  const len = pcmLen / inRate, t0 = segT0, chunks = pcm, n = pcmLen, mx = segMax;
+  newSeg();
+  if(n && len >= 0.8 && mx >= 0.0015){ const wav = encodeWav(chunks, n, inRate, 16000); pending = pending.then(() => upload(wav, t0, len)); }
+  return pending;
+}
+function encodeWav(chunks, n, inR, outR){
+  const flat = new Float32Array(n); let o = 0; for(const c of chunks){ flat.set(c, o); o += c.length; }
+  const ratio = inR / outR, m = Math.floor(n / ratio), out = new Int16Array(m);
+  for(let i = 0; i < m; i++){
+    const a = Math.floor(i * ratio), b = Math.min(n, Math.floor((i + 1) * ratio)); let s3 = 0;
+    for(let j = a; j < b; j++) s3 += flat[j];
+    out[i] = Math.max(-1, Math.min(1, s3 / Math.max(1, b - a))) * 0x7fff;
+  }
+  const buf = new ArrayBuffer(44 + m * 2), dv = new DataView(buf);
+  const w = (p, t) => { for(let i = 0; i < t.length; i++) dv.setUint8(p + i, t.charCodeAt(i)); };
+  w(0, "RIFF"); dv.setUint32(4, 36 + m * 2, true); w(8, "WAVE"); w(12, "fmt "); dv.setUint32(16, 16, true);
+  dv.setUint16(20, 1, true); dv.setUint16(22, 1, true); dv.setUint32(24, outR, true); dv.setUint32(28, outR * 2, true);
+  dv.setUint16(32, 2, true); dv.setUint16(34, 16, true); w(36, "data"); dv.setUint32(40, m * 2, true);
+  new Int16Array(buf, 44).set(out);
+  return new Blob([buf], {type: "audio/wav"});
+}
+function elapsedNow(){ return elapsedBase+(startedAt?(performance.now()-startedAt)/1000:0); }
+async function upload(blob,t0,dur){
+  const fd=new FormData(); fd.append("sid",sid); fd.append("seq",String(seq++)); fd.append("t0",String(t0.toFixed(1))); fd.append("dur",String(dur.toFixed(1))); fd.append("mime","audio/wav");
+  fd.append("file",blob,"chunk.wav");
+  for(let i=0;i<3;i++){            // 网络抖一下就重试,别丢这一句
+    try{ const r=await fetch(api("chunk"),{method:"POST",body:fd}); if(r.ok||r.status===410) return; }catch(e){}
+    await new Promise(ok=>setTimeout(ok,1500*(i+1)));
+  }
+  toast("网络不好,有一段没传上去","error");
+}
+function stopMic(){
+  try{ window.TKDraft && TKDraft.stop(); }catch(e){}
+  try{ if(pcmLen) flushSeg(); }catch(e){}                    // 最后一句别丢
+  try{ if(proc){ proc.onaudioprocess = null; proc.disconnect(); } if(srcNode) srcNode.disconnect(); if(sink) sink.disconnect(); }catch(e){}
+  stream?.getTracks().forEach(t => t.stop()); try{ actx?.close(); }catch(e){} wake?.release?.();
+  stream = actx = proc = srcNode = sink = null;
+  return pending;
+}
+/* ---------- 录制界面 ---------- */
+function enterLive(){
+  show("live"); $("#chip").style.display="inline"; $("#chip").textContent=chosen.split(" ")[0];
+  $("#liveTitle").textContent=chosen; $("#sideCourse").textContent=chosen; $("#sideWhere").textContent=(ME&&ME.sync&&ME.sync.mode==="none")?"结束后在这页下载":"下课自动存成笔记,同步到 Obsidian";
+  applyView();
+  connect(); startedAt=performance.now(); recording=true; clearInterval(tick); tick=setInterval(()=>$("#timer").textContent=fmt(elapsedNow()),500);
+}
+function setPaused(p, withMic=true){
+  paused=p; $("#bar").classList.toggle("paused",p); $("#pauseBtn").textContent=p?"▶ 继续":"❚❚ 暂停";
+  if(p){ elapsedBase=elapsedNow(); startedAt=0; if(withMic) stopMic(); }
+  else { startedAt=performance.now(); startMic().catch(e=>{toast(e.message,"error");}); }
+}
+$("#startBtn").onclick=async()=>{
+  $("#startBtn").disabled=true;
+  try{ await startMic(); }catch(e){ toast("拿不到麦克风:"+e.message,"error"); $("#startBtn").disabled=false; return; }
+  const j=await post("start",{course:chosen}); if(!j.ok){ stopMic(); $("#startBtn").disabled=false; return; }
+  sid=j.sid; elapsedBase=0; seq=0; nTrans=0; nQa=0; $("#trans").innerHTML='<div class="empty" id="transEmpty">等老师开口…</div>'; $("#qa").innerHTML='<div class="empty" id="qaEmpty">还没有人提问。</div>'; $("#sum").innerHTML='<div class="empty">讲过一段内容后,这里会按主题出现笔记。</div>';
+  enterLive(); toast((j.trial?"试用额度中 · ":"")+"开始录制:"+chosen,"ok");
+};
+$("#pauseBtn").onclick=()=>setPaused(!paused);
+$("#stopBtn").onclick=async()=>{ if(!confirm("结束这节课并保存?")) return; $("#stopBtn").disabled=true; $("#stopBtn").textContent="保存中…"; await stopMic(); recording=false; await post("stop",{sid}); };
+$("#doneBack").onclick=()=>{ $("#stopBtn").disabled=false; $("#stopBtn").textContent="⏺ 结束并保存"; $("#startBtn").disabled=!chosen; loadConfig(); };
+// 切换按钮悬挂在顶上:切到「转写」直接看最新一句,切到「总结 / 提问」从头看
+function setHdr(){ const h=document.querySelector("header"); if(!h) return; const b=Math.max(0,Math.round(h.getBoundingClientRect().bottom)); document.documentElement.style.setProperty("--hdr", b+"px"); }
+setHdr(); addEventListener("resize", setHdr); addEventListener("scroll", setHdr, {passive:true});
+document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("on"));t.classList.add("on");document.querySelectorAll(".pane").forEach(p=>p.classList.toggle("on",p.id===t.dataset.p));
+  if(document.body.classList.contains("wide")) return;
+  if(t.dataset.p==="trans") window.scrollTo(0,document.body.scrollHeight);
+  else { const st=$("#stick"); const top=st.parentElement.getBoundingClientRect().top+scrollY-(parseInt(getComputedStyle(document.documentElement).getPropertyValue("--hdr"))||58); window.scrollTo(0,Math.max(0,top)); }
+});
+document.addEventListener("visibilitychange",async()=>{ if(document.visibilityState==="visible"&&recording&&!paused&&!wake){ try{wake=await navigator.wakeLock?.request("screen");}catch(e){} } });
+
+let nTrans=0,nQa=0;
+function addSeg(s){ if(document.getElementById("s"+s.id)) return; $("#transEmpty")?.remove(); document.querySelectorAll(".seg.latest").forEach(x=>x.classList.remove("latest"));
+  const d=document.createElement("div"); d.className="seg latest"; d.id="s"+s.id; d.innerHTML=`<div class="ts">${esc(s.t)}</div><div><div class="en">${esc(s.en)}</div><div class="zh">${esc(s.zh||"")}</div></div>`;
+  $("#trans").appendChild(d); const dr=document.getElementById("draft"); if(dr) $("#trans").appendChild(dr); nTrans++; $("#nTrans").textContent=nTrans; if($("#trans").classList.contains("on")) window.scrollTo(0,document.body.scrollHeight); }
+function setDraft(text){
+  const box=$("#trans"); let d=document.getElementById("draft");
+  if(!text){ d?.remove(); return; }
+  $("#transEmpty")?.remove();
+  if(!d){ d=document.createElement("div"); d.id="draft"; d.className="seg draft"; d.innerHTML='<div class="ts">…</div><div><div class="en"></div></div>'; }
+  box.appendChild(d); d.querySelector(".en").textContent=text;
+}
+function setZh(id,zh){ const e=document.querySelector("#s"+id+" .zh"); if(e) e.textContent=zh; }
+function renderSummary(items){ if(!items||!items.length) return; $("#sum").innerHTML=items.map(sec=>`<div class="sum-sec"><div class="topic">${esc(sec.topic)}</div><ul>`+(sec.points||[]).map(p=>`<li><b>${esc(p.k)}</b>:${esc(p.v)}</li>`).join("")+`</ul></div>`).join(""); }
+function addQA(q){ if(document.getElementById("qa"+q.id)) return; $("#qaEmpty")?.remove(); const d=document.createElement("div"); d.className="qa"; d.id="qa"+q.id;
+  d.innerHTML=`<div class="q">${esc(q.question_zh)} <small style="color:var(--ink3);font-weight:400">${esc(q.t)}</small></div><div class="qen">${esc(q.question_en)}</div><div class="azh">💡 ${esc(q.answer_zh)}</div><div class="aen"><span>🗣 ${esc(q.answer_en)}</span><button>复制</button></div>`;
+  d.querySelector("button").onclick=e=>{navigator.clipboard?.writeText(q.answer_en);e.target.textContent="已复制";}; $("#qa").prepend(d); nQa++; $("#nQa").textContent=nQa; if(!$("#qa").classList.contains("on")) toast("老师提问了:"+q.question_zh); }
+function connect(){
+  es&&es.close(); es=new EventSource(api("stream?sid="+encodeURIComponent(sid)));
+  es.onmessage=e=>{ const m=JSON.parse(e.data);
+    if(m.type==="seg") addSeg(m); else if(m.type==="seg_zh") setZh(m.id,m.zh); else if(m.type==="summary") renderSummary(m.items); else if(m.type==="qa") addQA(m);
+    else if(m.type==="status") toast(m.msg,m.level); else if(m.type==="saved"){ es.close(); recording=false; clearInterval(tick); $("#chip").style.display="none"; $("#doneWhere").textContent=(m.where||m.path)+"(共 "+m.n+" 句)"; if(m.download&&!ME.owner){ $("#dlBtn").href=api(m.download); $("#dlBtn").style.display="inline-flex"; } else $("#dlBtn").style.display="none"; show("done"); } };
+  es.onerror=()=>{ es.close(); setTimeout(connect,3000); };
+}
+loadConfig();
+</script>
+</body>
+</html>

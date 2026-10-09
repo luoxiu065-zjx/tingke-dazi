@@ -1,0 +1,22 @@
+# COMP6203 Intelligent Agents 术语(逗号或换行分隔,可自己加;# 开头是注释)
+Marchioni, Rastegari, Peart, Wooldridge, Shoham, Leyton-Brown,
+utility theory, expected utility, Nash equilibrium, dominant strategy, Pareto optimal, social welfare,
+normal form game, extensive form game, mixed strategy, Prisoner's Dilemma, subgame perfect,
+negotiation, alternating offers, Rubinstein, auction, Vickrey auction, second-price sealed-bid, English auction, Dutch auction,
+mechanism design, incentive compatible, voting, Condorcet, Borda count, Arrow's theorem,
+coalition formation, Shapley value, core, BDI, multi-agent system, Panopto
+
+# 课件自动补充 2026-10-06
+Function, Bagging, Tree, Bootstrapping, Randomly
+
+# 课件自动补充 2026-10-06
+Boosting, Training Data, Example, Adaboost, Rule, High, Random Forest, Different, Correct, Algorithm, Subtle
+
+# 课件自动补充 2026-10-09
+Expected, Auctions, Case, Vickrey, Solution, English, Single, Proof, Dutch, Setting, Game, Therefore, Note, Every Auction, Consider, Assume, Discrete Bids, Calculate, Bidding, Suppose, First, Social, Model, Optimal, Continuous, Distributions, Continuous Bids, Define, Describe, Auction Design, Objectives, Typical, Sealed, Auctioneer, Bidders, Bayesian, However, Exercise, Find, Revenue, Bayes, Nash, Hence, Online, GSP
+
+# 课件自动补充 2026-10-09
+IPV
+
+# 课件自动补充 2026-10-09
+Envy
