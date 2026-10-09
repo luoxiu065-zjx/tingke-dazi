@@ -205,6 +205,11 @@
   .ctx-text{max-height:52vh;overflow:auto;white-space:pre-wrap;font-size:13px;line-height:1.6;background:#F6F9FE;border:1px solid var(--line-cool);border-radius:10px;padding:12px 14px;color:var(--ink)}
   /* 状态条 */
   .seg.draft .en{color:var(--ink3);font-style:italic} .seg.draft .ts{opacity:.5}
+  .guide{border:2px solid #FFC83D;max-width:800px;padding:22px 34px;margin-bottom:16px} .guide h2{margin:0 0 10px;font-size:18px}
+  .gstep{display:flex;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)} .gstep:first-of-type{border-top:0}
+  .gstep>b{flex:none;width:28px;height:28px;border-radius:50%;background:#FFC83D;display:grid;place-items:center}
+  .gstep>div{flex:1} .gt{font-weight:600} .gs{font-size:13px;color:var(--ink3);margin-top:2px} .gs a{color:var(--blue)}
+  .gok{display:none;color:var(--ok);font-weight:600;font-size:13px;margin-left:8px} .gstep.done .gok{display:inline} .gstep.done button{display:none}
   #toast{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:12;background:#fff;border:1px solid var(--line);box-shadow:var(--shadow-md);border-radius:999px;padding:8px 16px;font-size:13.5px;color:var(--ink2);max-width:80vw;display:none}
   #toast.ok{color:var(--ok)} #toast.error{color:var(--red)}
   #toast a{color:var(--blue);cursor:pointer;margin-left:8px}
@@ -259,11 +264,26 @@
     <div class="src">选择声音来源 <select id="device"></select><button class="btn btn-ghost btn-sm" id="slideBtnLive" style="display:none" title="随时加课件,下一次总结/提问起生效">＋ 课件 <span id="slideCount"></span></button></div>
   </div>
 
+  <section class="card guide" id="guide" style="display:none">
+    <h2>开始前三步(第一次用才需要)</h2>
+    <div class="gstep" id="g1"><b>1</b><div><div class="gt">填 DeepSeek key<span class="gok">✓ 已填</span></div><div class="gs">翻译、AI 总结、老师提问都靠它。去 platform.deepseek.com 注册、充几块钱、创建 key。不会就看 <a href="http://43.165.7.249:8092/media/guide/deepseek-key.mp4" target="_blank">16 秒录屏</a>。</div></div><button class="btn btn-pri btn-sm" id="g1Btn">去填</button></div>
+    <div class="gstep" id="g2"><b>2</b><div><div class="gt">改成你自己的课程<span class="gok">✓ 已改</span></div><div class="gs">现在是示例课程。一行一门,写「课号 名称」,比如 COMP6246 机器学习。</div></div><button class="btn btn-pri btn-sm" id="g2Btn">改课程</button></div>
+    <div class="gstep"><b>3</b><div><div class="gt">选声音来源(右上角)</div><div class="gs">在教室听课选「麦克风」;网课、录播选「电脑播放的声音」。选好就点下面的「开始录制」。</div></div></div>
+  </section>
+  <div class="modal-bg" id="courseModal">
+    <div class="modal">
+      <h3>改课程</h3>
+      <p class="sub">一行一门,写「课号 名称」,比如 <code>COMP6246 机器学习</code>。记录会按课号分文件夹。「其他」会自动保留。</p>
+      <textarea id="courseText" rows="7" style="width:100%;border:1px solid var(--line-cool);border-radius:10px;padding:10px;font:inherit;font-size:14px"></textarea>
+      <div class="mrow"><span class="sp" id="courseMsg"></span><button class="btn btn-ghost btn-sm" id="courseCancel">取消</button><button class="btn btn-pri btn-sm" id="courseSave">保存</button></div>
+    </div>
+  </div>
   <section class="card" id="setup">
     <h2>这是哪门课?</h2>
     <p class="sub">每次开始前先选课程。记录会按课程分文件夹存进 Obsidian,文件名带日期和时间。 它只识别英文:请录老师的英文讲课,对着它说中文会出乱码。</p>
     <div class="label">课程</div>
     <div class="courses" id="courses"></div>
+    <button class="chip-add" id="editCourses" style="margin:-4px 0 14px">✎ 改课程</button>
     <div class="label">课件 <span style="color:var(--mute);font-size:12px">pdf / pptx / md / txt,AI 总结和提问会参考;随时可加,也可以直接拖文件进窗口</span></div>
     <div class="slides" id="slidesBox"><button class="chip-add" id="slideAdd">＋ 添加课件</button></div>
     <input type="file" id="slideFile" accept=".pdf,.pptx,.md,.txt" multiple style="display:none">
@@ -682,10 +702,24 @@ $("#stKey").addEventListener("change",()=>{ if($("#stKey").value.trim().length>8
 function stForm(){ return {provider:$("#stProv").value, base_url:$("#stBase").value, model:curModel(), api_key:$("#stKey").value, keep_key:!$("#stKey").value, phone_link:$("#stPhone").value.trim()}; }
 $("#stTest").onclick=async()=>{ const m=$("#stMsg"); m.className="sp"; m.textContent="测试中…"; $("#stTest").disabled=true; const j=await post("/settings/test",stForm()); $("#stTest").disabled=false;
   if(j.ok){ m.className="sp ok"; m.textContent=`通了,${j.ms} ms,模型回:${j.reply}`; } else { m.className="sp err"; m.textContent=j.msg||"失败"; } };
-$("#stSave").onclick=async()=>{ const m=$("#stMsg"); const j=await post("/settings",stForm()); if(j.ok){ $("#settings").classList.remove("on"); loadBalance(true); } else { m.className="sp err"; m.textContent=j.msg||"保存失败"; } };
+$("#stSave").onclick=async()=>{ const m=$("#stMsg"); const j=await post("/settings",stForm()); if(j.ok){ $("#settings").classList.remove("on"); loadBalance(true); refreshGuide(); } else { m.className="sp err"; m.textContent=j.msg||"保存失败"; } };
 $("#stCancel").onclick=()=>$("#settings").classList.remove("on");
 $("#settings").addEventListener("click",e=>{ if(e.target.id==="settings") $("#settings").classList.remove("on"); });
 $("#gearBtn").onclick=openSettings;
+/* ---------- 新手引导 + 改课程 ---------- */
+async function refreshGuide(){
+  let hasKey=true; try{ hasKey=(await (await fetch("/settings")).json()).has_key; }catch(e){}
+  const demo=!courses.length||courses.every(c=>c==="其他"||/示例|COMP0001/.test(c));
+  $("#g1").classList.toggle("done",hasKey); $("#g2").classList.toggle("done",!demo);
+  $("#guide").style.display=(!hasKey||demo)&&S.state==="idle"?"block":"none";
+}
+function openCourses(){ $("#courseText").value=courses.filter(c=>c!=="其他"&&!/示例|COMP0001/.test(c)).join("\n"); $("#courseMsg").textContent=""; $("#courseModal").classList.add("on"); setTimeout(()=>$("#courseText").focus(),100); }
+$("#g1Btn").onclick=openSettings; $("#g2Btn").onclick=openCourses; $("#editCourses").onclick=openCourses;
+$("#courseCancel").onclick=()=>$("#courseModal").classList.remove("on");
+$("#courseModal").addEventListener("click",e=>{ if(e.target.id==="courseModal") $("#courseModal").classList.remove("on"); });
+$("#courseSave").onclick=async()=>{ const cs=$("#courseText").value.split("\n").map(x=>x.trim()).filter(Boolean);
+  if(!cs.length){ $("#courseMsg").textContent="至少写一门课"; return; }
+  const j=await post("/courses",{courses:cs}); if(j.ok){ $("#courseModal").classList.remove("on"); await loadConfig(); refreshGuide(); } };
 setInterval(()=>loadBalance(false), 120000);
 
 wireGrid(); render();
@@ -700,7 +734,7 @@ if(location.search.includes("preview=1")){
   addQA({id:1,t:"00:25:04",question_zh:"为什么选信息增益最高的属性来划分?",question_en:"Why do we prefer the attribute with the highest information gain?",answer_zh:"增益最高意味着划分后子节点最纯,熵降得最多,树更浅、更好解释。",answer_en:"Because it gives the purest child nodes, so the tree stays shallow and easier to interpret."});
   addMsg("me","熵和基尼系数有什么区别?"); addMsg("ai","结论:都是衡量「不纯度」的指标,数值不同但选出来的属性通常一样。熵用对数,基尼用平方,基尼算得更快;sklearn 默认用基尼。课上 00:24:50 讲的信息增益就是基于熵的。",{id:"preview",saved:false});
 } else {
-  loadConfig().then(()=>{ loadRecords(); loadBalance(true); connect(); });
+  loadConfig().then(()=>{ loadRecords(); loadBalance(true); connect(); refreshGuide(); });
 }
 </script>
 </body>

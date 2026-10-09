@@ -1,6 +1,0 @@
-# 示例:COMP0001 课的专业词,帮语音识别认得这些词。逗号或换行分隔,# 开头的行是注释。
-# 每门课建一个「课号.txt」,课号要和 .env 里 COURSES 的第一个词一致。
-gradient descent, learning rate, loss function, overfitting, underfitting, regularization,
-cross-validation, bias-variance, precision, recall, F1 score, confusion matrix,
-logistic regression, SVM, kernel, perceptron, backpropagation, PCA, K-means,
-CNN, RNN, LSTM, dropout, epoch, hyperparameter, scikit-learn, PyTorch, NumPy

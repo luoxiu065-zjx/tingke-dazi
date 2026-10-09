@@ -1,7 +1,0 @@
-# COMP6203 Intelligent Agents 术语(逗号或换行分隔,可自己加;# 开头是注释)
-Marchioni, Rastegari, Peart, Wooldridge, Shoham, Leyton-Brown,
-utility theory, expected utility, Nash equilibrium, dominant strategy, Pareto optimal, social welfare,
-normal form game, extensive form game, mixed strategy, Prisoner's Dilemma, subgame perfect,
-negotiation, alternating offers, Rubinstein, auction, Vickrey auction, second-price sealed-bid, English auction, Dutch auction,
-mechanism design, incentive compatible, voting, Condorcet, Borda count, Arrow's theorem,
-coalition formation, Shapley value, core, BDI, multi-agent system, Panopto

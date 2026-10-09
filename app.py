@@ -1176,6 +1176,26 @@ def slides_remove():
 
 ENV_PATH = os.path.join(BASE, ".env")
 
+@app.route("/courses", methods=["POST"])
+def courses_save():
+    """在页面上改课程表(2026-10-09):写回 .env 的 COURSES,马上生效。上课中不让改。"""
+    if STATE["state"] != "idle":
+        return jsonify({"ok": False, "msg": "正在上课,下课后再改课程"}), 400
+    raw = (request.get_json(force=True, silent=True) or {}).get("courses") or []
+    cs = []
+    for c in raw:
+        c = re.sub(r"\s+", " ", str(c).replace(",", " ").replace("，", " ")).strip()[:60]
+        if c and c not in cs:
+            cs.append(c)
+    if not [c for c in cs if c != "其他"]:
+        return jsonify({"ok": False, "msg": "至少写一门课(一行一门,比如 COMP6246 机器学习)"}), 400
+    if "其他" not in cs:
+        cs.append("其他")
+    llmcfg.write_env(ENV_PATH, {"COURSES": ",".join(cs)})
+    COURSES[:] = cs
+    status("课程表已更新:%d 门" % (len(cs) - 1), "ok")
+    return jsonify({"ok": True, "courses": cs})
+
 @app.route("/settings", methods=["GET"])
 def settings_get():
     prov = os.getenv("LLM_PROVIDER") or llmcfg.guess_provider(DEEPSEEK_BASE)
