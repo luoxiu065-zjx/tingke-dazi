@@ -20,3 +20,5 @@ __pycache__/
 *.bak*
 _*.py
 logs/
+electron/node_modules/
+electron/dist/

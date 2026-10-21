@@ -1,0 +1,53 @@
+# 听课搭子 桌面版打包配置(electron-builder)
+# 产物:dist/tingke-dazi-setup-<版本>.exe,不签名(第一次运行 Windows 会提示「更多信息 → 仍要运行」)
+appId: io.github.luoxiu065-zjx.tingke-dazi
+productName: 听课搭子
+copyright: Copyright © 2026 luoxiu065-zjx
+forceCodeSigning: false
+directories:
+  output: dist
+  buildResources: build
+files:
+  - main.js
+  - splash.html
+  - package.json
+# 把 Python 程序本体一起打进安装包(放在 resources/app-src),第一次启动时复制到
+# %LOCALAPPDATA%\tingke-dazi\app,之后在那个文件夹里装 Python 和依赖、存笔记
+extraResources:
+  - from: ../
+    to: app-src
+    filter:
+      - "*.py"
+      - "!_*.py"
+      - "index.html"
+      - "requirements.txt"
+      - "requirements-gpu.txt"
+      - ".env.example"
+      - "_install.ps1"
+      - "配置Obsidian.bat"
+      - "LICENSE"
+      - "README.md"
+      - "术语/**"
+      - "profile/README.txt"
+      - "profile/*.example.md"
+      - "!electron/**"
+      - "!phone/**"
+      - "!tests/**"
+      - "!python/**"
+      - "!venv/**"
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.ico
+  artifactName: tingke-dazi-setup-${version}.exe
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  shortcutName: 听课搭子
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  installerLanguages: [zh_CN]
+  language: 2052
+  deleteAppDataOnUninstall: false

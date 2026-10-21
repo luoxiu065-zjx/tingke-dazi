@@ -6,6 +6,12 @@
 - 原作者：[luoxiu065-zjx](https://github.com/luoxiu065-zjx) · 原始仓库：https://github.com/luoxiu065-zjx/tingke-dazi
 - 许可证：[PolyForm Noncommercial 1.0.0](LICENSE) —— **个人学习、非商业用途免费使用、修改和分享**；**禁止任何商业用途**（包括售卖软件或安装包、付费代装、打包进付费课程/产品等）。转发或修改时必须保留 LICENSE 里的 `Required Notice` 版权声明。需要商业授权请联系作者。
 
+## 桌面版(v0.4 起,推荐)
+
+不想碰 .bat 的话,直接下载安装包 `tingke-dazi-setup-0.4.0.exe`(约 100MB),双击安装,桌面和开始菜单会出现「听课搭子」图标。它是一层 Electron 壳:第一次打开会自动在 `%LOCALAPPDATA%	ingke-dazipp` 里下载 Python 和依赖(约 2GB,窗口里有进度),之后每次双击图标就开,关窗口就停,不会再有多个实例抢端口的问题。安装包没有代码签名,Windows 弹「已保护你的电脑」时点「更多信息 → 仍要运行」。
+
+你的 `.env`、课堂记录、课件都在 `%LOCALAPPDATA%	ingke-dazipp`(托盘图标右键「打开程序文件夹」),升级不会动它们。壳的源码在 `electron/`,自己打包:`cd electron && npm install && npm run build`。
+
 ## 第一次用,照着做(约 15 分钟,不用改任何文件)
 
 只要一台 Windows 10 / 11 电脑。有 NVIDIA 显卡最好,没有也能用。Mac、iPad、手机请用网页版(见 `phone/`)。

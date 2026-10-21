@@ -1,0 +1,18 @@
+{
+  "name": "tingke-dazi-desktop",
+  "productName": "听课搭子",
+  "version": "0.4.0",
+  "description": "听课搭子 桌面版:把网页界面装进独立窗口,自动拉起后台识别程序",
+  "author": "luoxiu065-zjx",
+  "license": "SEE LICENSE IN ../LICENSE",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --publish never"
+  },
+  "devDependencies": {
+    "electron": "43.8.3",
+    "electron-builder": "26.15.3"
+  }
+}

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>听课搭子</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { margin: 0; font-family: "Microsoft YaHei", "PingFang SC", sans-serif; background: #fff8f0; color: #333; display: flex; flex-direction: column; height: 100vh; }
+  @media (prefers-color-scheme: dark) { body { background: #1e1b18; color: #eee; } pre { background: #2a2622 !important; color: #ddd !important; } }
+  header { padding: 28px 32px 12px; display: flex; align-items: center; gap: 14px; }
+  .mark { width: 44px; height: 44px; border-radius: 12px; background: #f28c28; color: #fff; font-weight: 700; font-size: 26px; display: flex; align-items: center; justify-content: center; }
+  h1 { font-size: 20px; margin: 0; }
+  #status { padding: 0 32px 10px; font-size: 15px; line-height: 1.6; }
+  #hint { padding: 0 32px 10px; font-size: 13px; opacity: .7; }
+  pre { flex: 1; margin: 0 32px 24px; padding: 12px; background: #fff; border-radius: 10px; font-size: 12px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
+  .bar { height: 4px; margin: 0 32px 12px; background: rgba(242,140,40,.2); border-radius: 2px; overflow: hidden; }
+  .bar i { display: block; width: 30%; height: 100%; background: #f28c28; animation: slide 1.4s infinite; }
+  @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(400%); } }
+  .err .bar i { animation: none; width: 100%; background: #d33; }
+</style>
+</head>
+<body>
+  <header><div class="mark">听</div><h1>听课搭子</h1></header>
+  <div id="status">正在准备…</div>
+  <div class="bar"><i></i></div>
+  <div id="hint"></div>
+  <pre id="log"></pre>
+<script>
+  const { ipcRenderer } = require('electron');
+  const status = document.getElementById('status'), hint = document.getElementById('hint'), log = document.getElementById('log');
+  ipcRenderer.on('status', (_e, text, sub) => { status.textContent = text; hint.textContent = sub || ''; });
+  ipcRenderer.on('log', (_e, line) => { log.textContent += line; if (log.textContent.length > 60000) log.textContent = log.textContent.slice(-40000); log.scrollTop = log.scrollHeight; });
+  ipcRenderer.on('error', (_e, text, sub) => { document.body.classList.add('err'); status.textContent = text; hint.textContent = sub || ''; });
+</script>
+</body>
+</html>
